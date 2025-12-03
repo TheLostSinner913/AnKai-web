@@ -1,170 +1,615 @@
-import Guide from '@/components/Guide';
-import { trim } from '@/utils/format';
-import { PageContainer, StatisticCard } from '@ant-design/pro-components';
-import { useModel, history } from '@umijs/max';
-import { Card, Col, Row, Typography, Button, message, Space } from 'antd';
-import { testConnection, getServerInfo, logout } from '@/services/user';
-import { useState } from 'react';
+import { useModel } from '@umijs/max';
+import {
+  Card,
+  Col,
+  Row,
+  Typography,
+  Calendar,
+  Badge,
+  List,
+  Tag,
+  Button,
+  Modal,
+  Form,
+  Input,
+  DatePicker,
+  TimePicker,
+  Select,
+  Checkbox,
+  Empty,
+  message,
+  Spin,
+  Statistic,
+  Divider,
+  Avatar,
+  Tooltip,
+} from 'antd';
+import {
+  UserOutlined,
+  CheckSquareOutlined,
+  BellOutlined,
+  MailOutlined,
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  CloudOutlined,
+  CalendarOutlined,
+  SunOutlined,
+  ClockCircleOutlined,
+  NotificationOutlined,
+  EyeInvisibleOutlined,
+  CheckOutlined,
+} from '@ant-design/icons';
+import { useState, useEffect } from 'react';
+import dayjs, { Dayjs } from 'dayjs';
+import { getDashboardStats, getGreeting, getWeather } from '@/services/dashboard';
+import {
+  getTodosByDate,
+  getTodoDatesInMonth,
+  addTodo,
+  updateTodo,
+  deleteTodo,
+  completeTodo,
+  ignoreTodo,
+  Todo,
+} from '@/services/todo';
+import { getVisibleAnnouncements, Announcement } from '@/services/announcement';
 import styles from './index.less';
 
-const { Title, Paragraph } = Typography;
+const { Title, Text, Paragraph } = Typography;
+const { TextArea } = Input;
 
 const HomePage: React.FC = () => {
-  const { name } = useModel('global');
-  const [loading, setLoading] = useState(false);
-  const [serverInfo, setServerInfo] = useState<any>(null);
+  const { initialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
 
-  // 测试后端连接
-  const handleTestConnection = async () => {
+  // 状态
+  const [loading, setLoading] = useState(true);
+  const [greeting, setGreeting] = useState<any>({});
+  const [stats, setStats] = useState<any>({});
+  const [weather, setWeather] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
+  const [todoDates, setTodoDates] = useState<string[]>([]);
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [todoModalVisible, setTodoModalVisible] = useState(false);
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [form] = Form.useForm();
+
+  // 加载数据
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // 选中日期变化时加载待办
+  useEffect(() => {
+    loadTodos(selectedDate);
+  }, [selectedDate]);
+
+  // 月份变化时加载日期标记
+  useEffect(() => {
+    loadTodoDates(selectedDate.year(), selectedDate.month() + 1);
+  }, [selectedDate.year(), selectedDate.month()]);
+
+  const loadData = async () => {
     setLoading(true);
     try {
-      const response = await testConnection();
-      if (response.code === 200) {
-        message.success('后端连接成功！');
-        console.log('连接测试结果:', response.data);
-      } else {
-        message.error('后端连接失败: ' + response.message);
-      }
+      const [greetingRes, statsRes, announcementRes] = await Promise.all([
+        getGreeting(),
+        getDashboardStats(),
+        getVisibleAnnouncements(5),
+      ]);
+
+      if (greetingRes.code === 200) setGreeting(greetingRes.data);
+      if (statsRes.code === 200) setStats(statsRes.data);
+      if (announcementRes.code === 200) setAnnouncements(announcementRes.data || []);
+
+      // 加载天气（使用免费API）
+      loadWeather();
     } catch (error) {
-      message.error('后端连接失败，请检查后端服务是否启动');
-      console.error('连接错误:', error);
+      console.error('加载数据失败:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 获取服务器信息
-  const handleGetServerInfo = async () => {
-    setLoading(true);
+  const loadWeather = async () => {
     try {
-      const response = await getServerInfo();
-      if (response.code === 200) {
-        setServerInfo(response.data);
-        message.success('获取服务器信息成功！');
-      } else {
-        message.error('获取服务器信息失败: ' + response.message);
+      const res = await getWeather();
+      if (res.code === 200 && res.data) {
+        setWeather({
+          city: res.data.city,
+          temp: res.data.temp,
+          desc: res.data.desc,
+          humidity: res.data.humidity,
+          icon: res.data.icon,
+        });
       }
     } catch (error) {
-      message.error('获取服务器信息失败');
-      console.error('获取信息错误:', error);
-    } finally {
-      setLoading(false);
+      console.error('获取天气失败:', error);
+      // 失败时使用默认值
+      setWeather({ city: '未知', temp: 20, desc: '晴', humidity: 50 });
     }
   };
 
-  // 用户登出
-  const handleLogout = async () => {
+  const loadTodoDates = async (year: number, month: number) => {
     try {
-      await logout();
-      localStorage.removeItem('token');
-      localStorage.removeItem('userInfo');
-      message.success('登出成功！');
-      history.push('/login');
+      const res = await getTodoDatesInMonth(year, month);
+      if (res.code === 200) {
+        setTodoDates(res.data || []);
+      }
     } catch (error) {
-      message.error('登出失败');
-      console.error('登出错误:', error);
+      console.error('加载待办日期失败:', error);
     }
   };
+
+  const loadTodos = async (date: Dayjs) => {
+    try {
+      const res = await getTodosByDate(date.format('YYYY-MM-DD'));
+      if (res.code === 200) {
+        setTodos(res.data || []);
+      }
+    } catch (error) {
+      console.error('加载待办失败:', error);
+    }
+  };
+
+  // 日历单元格渲染
+  const dateCellRender = (date: Dayjs) => {
+    const dateStr = date.format('YYYY-MM-DD');
+    const hasTodo = todoDates.includes(dateStr);
+    if (hasTodo) {
+      return (
+        <div style={{ position: 'absolute', bottom: 2, right: 2 }}>
+          <Badge status="processing" />
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // 处理日期选择
+  const onDateSelect = (date: Dayjs) => {
+    setSelectedDate(date);
+  };
+
+  // 打开新增待办弹窗
+  const openAddTodoModal = () => {
+    setEditingTodo(null);
+    form.resetFields();
+    form.setFieldsValue({
+      todoDate: selectedDate,
+      priority: 2,
+      color: '#1890ff',
+    });
+    setTodoModalVisible(true);
+  };
+
+  // 打开编辑待办弹窗
+  const openEditTodoModal = (todo: Todo) => {
+    setEditingTodo(todo);
+    form.setFieldsValue({
+      ...todo,
+      todoDate: dayjs(todo.todoDate),
+      startTime: todo.startTime ? dayjs(todo.startTime, 'HH:mm') : null,
+      endTime: todo.endTime ? dayjs(todo.endTime, 'HH:mm') : null,
+    });
+    setTodoModalVisible(true);
+  };
+
+  // 提交待办
+  const handleTodoSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      const todoData: Todo = {
+        ...values,
+        todoDate: values.todoDate.format('YYYY-MM-DD'),
+        startTime: values.startTime?.format('HH:mm') || null,
+        endTime: values.endTime?.format('HH:mm') || null,
+      };
+
+      let res;
+      if (editingTodo) {
+        res = await updateTodo(editingTodo.id!, todoData);
+      } else {
+        res = await addTodo(todoData);
+      }
+
+      if (res.code === 200) {
+        message.success(editingTodo ? '更新成功' : '添加成功');
+        setTodoModalVisible(false);
+        loadTodos(selectedDate);
+        loadTodoDates(selectedDate.year(), selectedDate.month() + 1);
+        loadData(); // 刷新统计
+      } else {
+        message.error(res.message || '操作失败');
+      }
+    } catch (error) {
+      console.error('提交失败:', error);
+    }
+  };
+
+  // 删除待办
+  const handleDeleteTodo = async (id: number) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个待办事项吗？',
+      onOk: async () => {
+        const res = await deleteTodo(id);
+        if (res.code === 200) {
+          message.success('删除成功');
+          loadTodos(selectedDate);
+          loadTodoDates(selectedDate.year(), selectedDate.month() + 1);
+          loadData();
+        }
+      },
+    });
+  };
+
+  // 完成待办
+  const handleCompleteTodo = async (id: number) => {
+    const res = await completeTodo(id);
+    if (res.code === 200) {
+      message.success('已完成');
+      loadTodos(selectedDate);
+      loadData();
+    }
+  };
+
+  // 忽略待办
+  const handleIgnoreTodo = async (id: number) => {
+    const res = await ignoreTodo(id);
+    if (res.code === 200) {
+      message.success('已忽略');
+      loadTodos(selectedDate);
+      loadData();
+    }
+  };
+
+  // 优先级颜色
+  const priorityColors: Record<number, string> = {
+    1: 'default',
+    2: 'blue',
+    3: 'red',
+  };
+  const priorityLabels: Record<number, string> = {
+    1: '低',
+    2: '中',
+    3: '高',
+  };
+
+  // 状态标签
+  const statusLabels: Record<number, { text: string; color: string }> = {
+    0: { text: '待办', color: 'orange' },
+    1: { text: '进行中', color: 'processing' },
+    2: { text: '已完成', color: 'success' },
+    3: { text: '已取消', color: 'default' },
+    4: { text: '已忽略', color: 'default' },
+  };
+
+  // 公告类型
+  const announcementTypeLabels: Record<number, { text: string; color: string }> = {
+    1: { text: '普通', color: 'default' },
+    2: { text: '重要', color: 'warning' },
+    3: { text: '紧急', color: 'error' },
+  };
+
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <Spin size="large" tip="加载中..." />
+      </div>
+    );
+  }
 
   return (
-    <PageContainer ghost>
-      <div className={styles.container}>
-        {/* 欢迎信息 */}
-        <Card style={{ marginBottom: 24 }}>
-          <Title level={2}>欢迎使用 AnKai 后台管理系统</Title>
-          <Paragraph>
-            这是一个基于 <strong>SpringBoot + Ant Design Pro</strong> 构建的现代化后台管理系统。
-            系统集成了用户管理、权限控制、数据展示等常用功能模块。
-          </Paragraph>
-          <Paragraph>
-            <strong>技术栈：</strong>
-            <br />
-            • 前端：React + TypeScript + Ant Design Pro + UmiJS
-            <br />
-            • 后端：SpringBoot + MyBatis Plus + MySQL
-            <br />
-            • 特性：分页查询、逻辑删除、自动填充、乐观锁、日志管理
-          </Paragraph>
-
-          {/* 连接测试按钮 */}
-          <Space>
-            <Button
-              type="primary"
-              loading={loading}
-              onClick={handleTestConnection}
-            >
-              测试后端连接
-            </Button>
-            <Button
-              loading={loading}
-              onClick={handleGetServerInfo}
-            >
-              获取服务器信息
-            </Button>
-            <Button
-              danger
-              onClick={handleLogout}
-            >
-              登出
-            </Button>
-          </Space>
-
-          {/* 显示服务器信息 */}
-          {serverInfo && (
-            <Card style={{ marginTop: 16 }} title="服务器信息">
-              <p><strong>服务名称：</strong>{serverInfo.serverName}</p>
-              <p><strong>版本：</strong>{serverInfo.version}</p>
-              <p><strong>框架：</strong>{serverInfo.framework}</p>
-              <p><strong>数据库：</strong>{serverInfo.database}</p>
-              <p><strong>当前时间：</strong>{serverInfo.currentTime}</p>
-            </Card>
-          )}
-        </Card>
-
-        {/* 统计卡片 */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          <Col xs={24} sm={12} md={6}>
-            <StatisticCard
-              statistic={{
-                title: '用户总数',
-                value: 1234,
-                suffix: '人',
-              }}
-            />
+    <div className={styles.container}>
+      {/* 欢迎语区域 */}
+      <div className={styles.greetingCard}>
+        <Row align="middle" justify="space-between" wrap={false}>
+          <Col flex="auto">
+            <div className={styles.greetingMain}>
+              <Avatar size={56} icon={<UserOutlined />} className={styles.avatar} />
+              <div className={styles.greetingText}>
+                <Title level={3} className={styles.greetingTitle}>
+                  {greeting.timeGreeting || '你好'}，{currentUser?.realName || currentUser?.username || '用户'}！
+                </Title>
+                <div className={styles.greetingMeta}>
+                  <CalendarOutlined style={{ marginRight: 6 }} />
+                  <span>{greeting.date || dayjs().format('YYYY年MM月DD日')} {greeting.weekday || ''}</span>
+                  {greeting.holiday && (
+                    <Tag color="red" style={{ marginLeft: 12 }}>{greeting.holiday}</Tag>
+                  )}
+                </div>
+              </div>
+            </div>
+            {/* 名人名言 */}
+            {greeting.quote && (
+              <div className={styles.quoteSection}>
+                <div className={styles.quoteText}>"{greeting.quote}"</div>
+                <div className={styles.quoteAuthor}>—— {greeting.quoteAuthor}</div>
+              </div>
+            )}
           </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatisticCard
-              statistic={{
-                title: '今日访问',
-                value: 567,
-                suffix: '次',
-              }}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatisticCard
-              statistic={{
-                title: '系统运行',
-                value: 99.9,
-                suffix: '%',
-              }}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <StatisticCard
-              statistic={{
-                title: '数据总量',
-                value: 8888,
-                suffix: '条',
-              }}
-            />
+          <Col>
+            <div className={styles.weatherInfo}>
+              {weather ? (
+                <>
+                  <div className={styles.weatherCity}>{weather.city}</div>
+                  <div className={styles.weatherMain}>
+                    <SunOutlined className={styles.weatherIcon} />
+                    <span className={styles.weatherTemp}>{weather.temp}°C</span>
+                  </div>
+                  <div className={styles.weatherDesc}>
+                    <span>{weather.desc}</span>
+                    <span style={{ marginLeft: 8 }}>湿度 {weather.humidity}%</span>
+                  </div>
+                </>
+              ) : (
+                <Text type="secondary" style={{ color: 'rgba(255,255,255,0.7)' }}>天气加载中...</Text>
+              )}
+            </div>
           </Col>
         </Row>
-
-        {/* 原有的Guide组件 */}
-        <Guide name={trim(name)} />
       </div>
-    </PageContainer>
+
+      {/* 统计卡片 */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        <Col xs={12} sm={12} md={6}>
+          <div className={styles.statCard} style={{ borderLeft: '4px solid #1890ff' }}>
+            <div className={styles.statIcon} style={{ background: 'rgba(24, 144, 255, 0.1)' }}>
+              <UserOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+            </div>
+            <Statistic
+              title={<span>用户总数 <span style={{ color: '#52c41a', fontSize: 12, marginLeft: 8 }}>在线: {stats.onlineUsers || 1}</span></span>}
+              value={stats.totalUsers || 0}
+              valueStyle={{ color: '#262626' }}
+            />
+          </div>
+        </Col>
+        <Col xs={12} sm={12} md={6}>
+          <div className={styles.statCard} style={{ borderLeft: '4px solid #52c41a' }}>
+            <div className={styles.statIcon} style={{ background: 'rgba(82, 196, 26, 0.1)' }}>
+              <CheckSquareOutlined style={{ fontSize: 24, color: '#52c41a' }} />
+            </div>
+            <Statistic title="待办事项" value={stats.pendingTodos || 0} valueStyle={{ color: '#262626' }} />
+          </div>
+        </Col>
+        <Col xs={12} sm={12} md={6}>
+          <div className={styles.statCard} style={{ borderLeft: '4px solid #faad14' }}>
+            <div className={styles.statIcon} style={{ background: 'rgba(250, 173, 20, 0.1)' }}>
+              <MailOutlined style={{ fontSize: 24, color: '#faad14' }} />
+            </div>
+            <Statistic title="未读消息" value={stats.unreadMessages || 0} valueStyle={{ color: '#262626' }} />
+          </div>
+        </Col>
+        <Col xs={12} sm={12} md={6}>
+          <div className={styles.statCard} style={{ borderLeft: '4px solid #ff4d4f' }}>
+            <div className={styles.statIcon} style={{ background: 'rgba(255, 77, 79, 0.1)' }}>
+              <BellOutlined style={{ fontSize: 24, color: '#ff4d4f' }} />
+            </div>
+            <Statistic title="系统公告" value={stats.unreadAnnouncements || 0} valueStyle={{ color: '#262626' }} />
+          </div>
+        </Col>
+      </Row>
+
+      {/* 日历和待办区域 */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        {/* 日历 - 使用更紧凑的布局 */}
+        <Col xs={24} md={10} lg={8}>
+          <Card
+            title={<><CalendarOutlined style={{ marginRight: 8 }} />日历</>}
+            className={styles.calendarCard}
+            bodyStyle={{ padding: '8px 12px' }}
+          >
+            <Calendar
+              fullscreen={false}
+              value={selectedDate}
+              onSelect={onDateSelect}
+              onPanelChange={(date) => {
+                loadTodoDates(date.year(), date.month() + 1);
+              }}
+              cellRender={(date, info) => {
+                if (info.type === 'date') {
+                  return dateCellRender(date);
+                }
+                return info.originNode;
+              }}
+            />
+          </Card>
+        </Col>
+
+        {/* 待办事项 */}
+        <Col xs={24} md={14} lg={16}>
+          <Card
+            title={
+              <span>
+                <CheckSquareOutlined style={{ marginRight: 8 }} />
+                待办事项 - {selectedDate.format('MM月DD日')}
+              </span>
+            }
+            extra={
+              <Button type="primary" size="small" icon={<PlusOutlined />} onClick={openAddTodoModal}>
+                添加
+              </Button>
+            }
+            className={styles.todoCard}
+            bodyStyle={{ padding: '12px 16px', maxHeight: 340, overflowY: 'auto' }}
+          >
+            {todos.length === 0 ? (
+              <Empty description="暂无待办事项" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '40px 0' }} />
+            ) : (
+              <div className={styles.todoList}>
+                {todos.map((todo) => {
+                  const isIgnored = todo.status === 4;
+                  const isCompleted = todo.status === 2;
+                  const isFinished = isIgnored || isCompleted;
+                  return (
+                    <div
+                      key={todo.id}
+                      className={`${styles.todoItem} ${isIgnored ? styles.todoItemIgnored : ''}`}
+                      style={{ borderLeftColor: isIgnored ? '#d9d9d9' : (todo.color || '#1890ff') }}
+                    >
+                      <div className={styles.todoContent}>
+                        <div className={styles.todoHeader}>
+                          <span
+                            className={styles.todoTitle}
+                            style={{ textDecoration: isCompleted && !isIgnored ? 'line-through' : 'none' }}
+                          >
+                            {todo.title}
+                          </span>
+                          <div className={styles.todoTags}>
+                            <Tag color={isIgnored ? 'default' : priorityColors[todo.priority || 2]} style={{ marginRight: 4 }}>
+                              {priorityLabels[todo.priority || 2]}
+                            </Tag>
+                            <Tag color={statusLabels[todo.status || 0].color}>
+                              {statusLabels[todo.status || 0].text}
+                            </Tag>
+                          </div>
+                        </div>
+                        {(todo.startTime || todo.description) && (
+                          <div className={styles.todoMeta}>
+                            {todo.startTime && (
+                              <span><ClockCircleOutlined style={{ marginRight: 4 }} />{todo.startTime} - {todo.endTime || '未设置'}</span>
+                            )}
+                            {todo.description && <span style={{ marginLeft: todo.startTime ? 12 : 0 }}>{todo.description}</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div className={styles.todoActions}>
+                        {!isFinished && (
+                          <>
+                            <Tooltip title="完成">
+                              <Button type="text" size="small" icon={<CheckOutlined style={{ color: '#52c41a' }} />} onClick={() => handleCompleteTodo(todo.id!)} />
+                            </Tooltip>
+                            <Tooltip title="忽略">
+                              <Button type="text" size="small" icon={<EyeInvisibleOutlined style={{ color: '#8c8c8c' }} />} onClick={() => handleIgnoreTodo(todo.id!)} />
+                            </Tooltip>
+                          </>
+                        )}
+                        {!isIgnored && (
+                          <Tooltip title="编辑">
+                            <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEditTodoModal(todo)} />
+                          </Tooltip>
+                        )}
+                        <Tooltip title="删除">
+                          <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteTodo(todo.id!)} />
+                        </Tooltip>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 系统公告 */}
+      <Card
+        title={<><NotificationOutlined style={{ marginRight: 8 }} />系统公告</>}
+        className={styles.announcementCard}
+        bodyStyle={{ padding: '12px 16px', maxHeight: 280, overflowY: 'auto' }}
+      >
+        {announcements.length === 0 ? (
+          <Empty description="暂无公告" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '20px 0' }} />
+        ) : (
+          <div className={styles.announcementList}>
+            {announcements.map((item) => (
+              <div key={item.id} className={styles.announcementItem}>
+                <div className={styles.announcementHeader}>
+                  {item.isTop === 1 && <Tag color="red">置顶</Tag>}
+                  <Tag color={announcementTypeLabels[item.announcementType || 1].color}>
+                    {announcementTypeLabels[item.announcementType || 1].text}
+                  </Tag>
+                  <span className={styles.announcementTitle}>{item.title}</span>
+                </div>
+                <div className={styles.announcementMeta}>
+                  <span className={styles.announcementAuthor}>
+                    <UserOutlined style={{ marginRight: 4 }} />
+                    {item.createByName || '系统'}
+                  </span>
+                  <span className={styles.announcementTime}>
+                    {item.publishTime ? dayjs(item.publishTime).format('YYYY-MM-DD HH:mm') : ''}
+                  </span>
+                </div>
+                <Paragraph ellipsis={{ rows: 2 }} className={styles.announcementContent}>
+                  {item.content}
+                </Paragraph>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* 待办事项弹窗 */}
+      <Modal
+        title={editingTodo ? '编辑待办' : '新增待办'}
+        open={todoModalVisible}
+        onOk={handleTodoSubmit}
+        onCancel={() => setTodoModalVisible(false)}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="title"
+            label="标题"
+            rules={[{ required: true, message: '请输入待办标题' }]}
+          >
+            <Input placeholder="请输入待办标题" maxLength={100} />
+          </Form.Item>
+
+          <Form.Item name="description" label="描述">
+            <TextArea placeholder="请输入待办描述" rows={3} maxLength={500} />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="todoDate"
+                label="日期"
+                rules={[{ required: true, message: '请选择日期' }]}
+              >
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="priority" label="优先级">
+                <Select>
+                  <Select.Option value={1}>低</Select.Option>
+                  <Select.Option value={2}>中</Select.Option>
+                  <Select.Option value={3}>高</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="startTime" label="开始时间">
+                <TimePicker format="HH:mm" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="endTime" label="结束时间">
+                <TimePicker format="HH:mm" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="color" label="颜色标记">
+            <Select>
+              <Select.Option value="#1890ff">🔵 蓝色</Select.Option>
+              <Select.Option value="#52c41a">🟢 绿色</Select.Option>
+              <Select.Option value="#faad14">🟡 黄色</Select.Option>
+              <Select.Option value="#ff4d4f">🔴 红色</Select.Option>
+              <Select.Option value="#722ed1">🟣 紫色</Select.Option>
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
   );
 };
 

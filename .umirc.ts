@@ -78,18 +78,28 @@ export default defineConfig({
       path: '/user',
       component: './User',
       icon: 'UserOutlined',
+      access: 'canAccessUser',
     },
     {
       name: '角色管理',
       path: '/role',
       component: './Role',
       icon: 'TeamOutlined',
+      access: 'canAccessRole',
     },
     {
       name: '权限管理',
       path: '/permission',
       component: './Permission',
       icon: 'SafetyOutlined',
+      access: 'canAccessPermission',
+    },
+    {
+      name: '公告管理',
+      path: '/announcement',
+      component: './Announcement',
+      icon: 'NotificationOutlined',
+      access: 'canAccessAnnouncement',
     },
     {
       name: '站内信',

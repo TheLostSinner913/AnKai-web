@@ -7,11 +7,6 @@ import { Avatar, Dropdown, message, Badge, Tooltip } from 'antd';
 import { UserOutlined, LogoutOutlined, MailOutlined } from '@ant-design/icons';
 import React, { useState, useEffect } from 'react';
 
-// 需要管理员权限的菜单路径
-const ADMIN_ONLY_PATHS = ['/role', '/permission'];
-// 管理员角色代码
-const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN'];
-
 // 全局未读消息数量
 let globalUnreadCount = 0;
 let globalSetUnreadCount: ((count: number) => void) | null = null;
@@ -84,12 +79,6 @@ export async function getInitialState(): Promise<{
     settings: {},
   };
 }
-
-// 检查用户是否有管理员权限
-const hasAdminRole = (roles?: string[]) => {
-  if (!roles) return false;
-  return roles.some(role => ADMIN_ROLES.includes(role));
-};
 
 // 退出登录
 const handleLogout = async (setInitialState: any) => {
@@ -193,7 +182,6 @@ const SiderFooter: React.FC<{ collapsed?: boolean; currentUser: any; userRoles: 
 export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) => {
   const currentUser = initialState?.currentUser;
   const userRoles = currentUser?.roles || [];
-  const isAdmin = hasAdminRole(userRoles);
 
   return {
     ...proLayoutSettings,
@@ -204,10 +192,8 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
     // 右上角不显示任何内容（站内信放到侧边栏底部了）
     actionsRender: () => [],
 
-    // 水印
-    waterMarkProps: {
-      content: currentUser?.username,
-    },
+    // 关闭水印
+    waterMarkProps: false,
 
     // 侧边栏底部额外内容
     menuFooterRender: (menuProps: any) => (
@@ -237,9 +223,6 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
     childrenRender: (children) => (
       <div style={{ minHeight: 'calc(100vh - 120px)', animation: 'fadeIn 0.3s ease-out' }}>{children}</div>
     ),
-
-    // 菜单数据处理 - 权限过滤
-    menuDataRender: (menuData) => menuData.filter((item) => !(item.path && ADMIN_ONLY_PATHS.includes(item.path)) || isAdmin),
 
     // 菜单点击事件
     onMenuHeaderClick: () => history.push('/home'),
