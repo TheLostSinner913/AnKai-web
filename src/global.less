@@ -1,0 +1,435 @@
+/**
+ * AnKai 后台管理系统 - 全局样式
+ * 统一的UI风格定义，包含颜色主题、阴影、圆角等
+ */
+
+// =============== 颜色变量定义 ===============
+@primary-color: #1890ff;           // 主色调 - 蓝色
+@primary-gradient-start: #1890ff;  // 主色渐变起始
+@primary-gradient-end: #096dd9;    // 主色渐变结束
+@success-color: #52c41a;           // 成功色
+@warning-color: #faad14;           // 警告色  
+@error-color: #ff4d4f;             // 错误色
+@text-primary: #1f2937;            // 主文本色
+@text-secondary: #6b7280;          // 次级文本色
+@text-disabled: #9ca3af;           // 禁用文本色
+
+// 背景色
+@bg-layout: #d8dce4;               // 布局背景色（更深的灰）
+@bg-page: #dce0e8;                 // 页面背景色（柔和的灰蓝）
+@bg-content: #d4d9e2;              // 内容区背景色（加深）
+@bg-card: #ffffff;                 // 卡片背景色
+@bg-header: linear-gradient(135deg, #667eea 0%, #764ba2 100%);  // 头部渐变
+
+// 阴影
+@shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+@shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+@shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+@shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+@shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+@shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+// 圆角
+@border-radius-sm: 4px;
+@border-radius-base: 8px;
+@border-radius-lg: 12px;
+@border-radius-xl: 16px;
+
+// =============== 全局样式重置 ===============
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// =============== 布局整体样式 ===============
+// 整个布局区域的背景
+.ant-pro-layout {
+  background: @bg-content !important;
+
+  // 内容区域 - 使用更柔和的灰色背景
+  .ant-pro-layout-content {
+    background: @bg-content;
+    padding: 24px;
+    min-height: calc(100vh - 56px);
+  }
+
+  // 页面容器背景
+  .ant-pro-page-container {
+    background: transparent;
+  }
+}
+
+// 整个HTML背景色
+html, body {
+  background: @bg-content !important;
+}
+
+// 侧边菜单样式优化
+.ant-pro-sider {
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%) !important;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 15%);
+  
+  .ant-menu {
+    background: transparent !important;
+    
+    .ant-menu-item {
+      margin: 4px 8px;
+      border-radius: @border-radius-base;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 10%) !important;
+      }
+      
+      &.ant-menu-item-selected {
+        background: linear-gradient(135deg, @primary-color, #40a9ff) !important;
+        box-shadow: 0 4px 12px rgba(24, 144, 255, 40%);
+      }
+    }
+    
+    .ant-menu-item-icon, .ant-menu-title-content {
+      color: rgba(255, 255, 255, 85%);
+    }
+    
+    .ant-menu-item-selected {
+      .ant-menu-item-icon, .ant-menu-title-content {
+        color: #fff;
+      }
+    }
+  }
+}
+
+// Logo区域
+.ant-pro-sider-logo {
+  background: rgba(0, 0, 0, 20%);
+  border-bottom: 1px solid rgba(255, 255, 255, 10%);
+  
+  h1 {
+    color: #fff !important;
+    font-weight: 600;
+  }
+}
+
+// =============== 顶部导航栏 ===============
+.ant-pro-top-nav-header, .ant-pro-global-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 15%);
+  
+  .anticon {
+    color: rgba(255, 255, 255, 85%);
+  }
+  
+  .ant-pro-global-header-logo h1 {
+    color: #fff !important;
+  }
+}
+
+// =============== ProTable 表格样式优化 ===============
+.ant-pro-table {
+  background: @bg-card;
+  border-radius: @border-radius-lg;
+  box-shadow: @shadow-card;
+  overflow: hidden;
+
+  .ant-pro-table-search {
+    background: linear-gradient(to right, #f8fafc, #f1f5f9);
+    padding: 20px 24px 8px;
+    border-radius: @border-radius-lg @border-radius-lg 0 0;
+    margin-bottom: 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .ant-pro-card {
+    background: transparent;
+  }
+}
+
+// 表格主体
+.ant-table {
+  background: @bg-card;
+
+  .ant-table-thead > tr > th {
+    background: linear-gradient(to bottom, #fafbfc, #f3f4f6);
+    border-bottom: 2px solid #e5e7eb;
+    font-weight: 600;
+    color: @text-primary;
+    padding: 14px 16px;
+  }
+
+  .ant-table-tbody > tr {
+    transition: all 0.2s ease;
+
+    &:hover > td {
+      background: #f0f9ff !important;
+    }
+
+    > td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+  }
+
+  // 斑马纹
+  .ant-table-tbody > tr:nth-child(even) {
+    background: #fafbfc;
+  }
+}
+
+// =============== 卡片样式优化 ===============
+.ant-card {
+  border-radius: @border-radius-lg;
+  box-shadow: @shadow-card;
+  border: none;
+  transition: all 0.3s ease;
+
+  &:hover {
+    box-shadow: @shadow-card-hover;
+    transform: translateY(-2px);
+  }
+
+  .ant-card-head {
+    background: linear-gradient(to right, #f8fafc, #f1f5f9);
+    border-bottom: 1px solid #e5e7eb;
+    border-radius: @border-radius-lg @border-radius-lg 0 0;
+
+    .ant-card-head-title {
+      font-weight: 600;
+      color: @text-primary;
+    }
+  }
+
+  .ant-card-body {
+    padding: 20px;
+  }
+}
+
+// =============== 按钮样式优化 ===============
+.ant-btn {
+  border-radius: @border-radius-lg !important;  // 更大的圆角
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: @shadow-sm;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: @shadow-base;
+  }
+
+  // 主要按钮（蓝色）
+  &.ant-btn-primary {
+    background: linear-gradient(135deg, @primary-color, #40a9ff);
+    border: none;
+
+    &:hover {
+      background: linear-gradient(135deg, #40a9ff, @primary-color);
+    }
+  }
+
+  // 默认按钮 - 加深的背景色
+  &.ant-btn-default {
+    background: linear-gradient(to bottom, #f0f2f5, #e8eaed);
+    border: 1px solid #c0c4cc;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 10%);
+    color: #4a5568;
+
+    &:hover {
+      background: linear-gradient(to bottom, #e8eaed, #dfe2e6);
+      border-color: @primary-color;
+      color: @primary-color;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 15%);
+    }
+  }
+}
+
+// 搜索区域的按钮统一圆角
+.ant-pro-table-search {
+  .ant-btn {
+    border-radius: @border-radius-lg !important;
+    min-width: 80px;
+
+    &.ant-btn-default {
+      background: linear-gradient(to bottom, #f0f2f5, #e8eaed);
+      border: 1px solid #c0c4cc;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 10%);
+      color: #4a5568;
+    }
+  }
+}
+
+// 表单中的按钮
+.ant-form {
+  .ant-btn {
+    border-radius: @border-radius-lg !important;
+  }
+}
+
+// 弹窗中的按钮
+.ant-modal-footer {
+  .ant-btn {
+    border-radius: @border-radius-lg !important;
+    min-width: 80px;
+  }
+}
+
+// =============== 表单样式优化 ===============
+.ant-input, .ant-select-selector, .ant-picker {
+  border-radius: @border-radius-base !important;
+  border: 1px solid #d1d5db;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: @primary-color;
+  }
+
+  &:focus, &.ant-input-focused {
+    border-color: @primary-color;
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 10%);
+  }
+}
+
+// =============== 弹窗样式优化 ===============
+.ant-modal {
+  .ant-modal-content {
+    border-radius: @border-radius-lg;
+    overflow: hidden;
+    box-shadow: @shadow-lg;
+  }
+
+  .ant-modal-header {
+    background: linear-gradient(to right, #f8fafc, #f1f5f9);
+    border-bottom: 1px solid #e5e7eb;
+    padding: 16px 24px;
+  }
+
+  .ant-modal-body {
+    padding: 24px;
+  }
+
+  .ant-modal-footer {
+    border-top: 1px solid #e5e7eb;
+    padding: 12px 24px;
+    background: #fafbfc;
+  }
+}
+
+// =============== 标签样式优化 ===============
+.ant-tag {
+  border-radius: 4px;
+  padding: 2px 10px;
+  font-weight: 500;
+  border: none;
+
+  &.ant-tag-green {
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    color: #065f46;
+  }
+
+  &.ant-tag-red {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    color: #991b1b;
+  }
+
+  &.ant-tag-blue {
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    color: #1e40af;
+  }
+
+  &.ant-tag-orange {
+    background: linear-gradient(135deg, #fed7aa, #fdba74);
+    color: #9a3412;
+  }
+}
+
+// =============== 消息提示优化 ===============
+.ant-message {
+  .ant-message-notice-content {
+    border-radius: @border-radius-base;
+    box-shadow: @shadow-md;
+    padding: 12px 20px;
+  }
+}
+
+// =============== 分页样式优化 ===============
+.ant-pagination {
+  .ant-pagination-item {
+    border-radius: @border-radius-base;
+    border: 1px solid #e5e7eb;
+
+    &:hover, &-active {
+      border-color: @primary-color;
+    }
+
+    &-active {
+      background: linear-gradient(135deg, @primary-color, #40a9ff);
+
+      a {
+        color: #fff;
+      }
+    }
+  }
+
+  .ant-pagination-prev, .ant-pagination-next {
+    .ant-pagination-item-link {
+      border-radius: @border-radius-base;
+    }
+  }
+}
+
+// =============== 页面标题区域 ===============
+.ant-pro-table-list-toolbar {
+  padding: 16px 0;
+
+  .ant-pro-table-list-toolbar-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: @text-primary;
+    position: relative;
+    padding-left: 12px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 20px;
+      background: linear-gradient(to bottom, @primary-color, #40a9ff);
+      border-radius: 2px;
+    }
+  }
+}
+
+// =============== 滚动条美化 ===============
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #c1c1c1, #a1a1a1);
+  border-radius: 4px;
+
+  &:hover {
+    background: linear-gradient(180deg, #a1a1a1, #818181);
+  }
+}
+
+// =============== 动画效果 ===============
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ant-pro-layout-content {
+  animation: fadeIn 0.3s ease-out;
+}
+
