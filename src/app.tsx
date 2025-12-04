@@ -3,15 +3,16 @@ import { getCurrentUser } from '@/services/user';
 import { getUnreadCount } from '@/services/message';
 import { history } from '@umijs/max';
 import { proLayoutSettings, colors } from '@/styles/theme';
-import { Avatar, Dropdown, message, Badge, Tooltip } from 'antd';
+import { Avatar, Dropdown, message, Badge, Tooltip, notification } from 'antd';
 import { UserOutlined, LogoutOutlined, MailOutlined } from '@ant-design/icons';
 import React, { useState, useEffect } from 'react';
+import { sseClient, SseEventData } from '@/utils/sse';
 
 // 全局未读消息数量
 let globalUnreadCount = 0;
 let globalSetUnreadCount: ((count: number) => void) | null = null;
 
-// 刷新未读消息数量的函数
+// 刷新未读消息数量的函数（作为SSE连接前的初始化和备用）
 const refreshUnreadCount = async () => {
   try {
     const response = await getUnreadCount();
@@ -23,6 +24,79 @@ const refreshUnreadCount = async () => {
     }
   } catch (error) {
     console.error('获取未读消息数量失败:', error);
+  }
+};
+
+// SSE消息处理
+const handleSseMessage = (data: SseEventData) => {
+  console.log('[SSE] 收到推送:', data);
+
+  // 更新未读消息数（站内信）
+  if (data.unreadCount !== undefined && globalSetUnreadCount) {
+    globalUnreadCount = data.unreadCount;
+    globalSetUnreadCount(data.unreadCount);
+  }
+
+  const msgData = data.data as any;
+
+  // 根据事件类型显示不同通知
+  switch (data.type) {
+    case 'new_message':
+      // 新站内信通知
+      notification.info({
+        message: '新消息',
+        description: `${msgData?.senderName || '某人'}: ${msgData?.content || data.message}`,
+        placement: 'topRight',
+        duration: 4,
+        onClick: () => {
+          history.push('/messages');
+          notification.destroy();
+        },
+      });
+      break;
+
+    case 'new_announcement':
+      // 新公告通知
+      const announcementTypeText = msgData?.announcementType === 3 ? '【紧急】' :
+        msgData?.announcementType === 2 ? '【重要】' : '';
+      notification.warning({
+        message: `${announcementTypeText}新公告`,
+        description: msgData?.title || data.message,
+        placement: 'topRight',
+        duration: 6,
+        onClick: () => {
+          history.push('/');
+          notification.destroy();
+        },
+      });
+      break;
+
+    case 'new_todo':
+      // 新待办事项通知
+      const priorityText = msgData?.priority === 3 ? '【高优先级】' :
+        msgData?.priority === 1 ? '【低优先级】' : '';
+      notification.info({
+        message: `${priorityText}新待办`,
+        description: msgData?.title || data.message,
+        placement: 'topRight',
+        duration: 5,
+        onClick: () => {
+          history.push('/');
+          notification.destroy();
+        },
+      });
+      break;
+
+    default:
+      // 其他类型的通知
+      if (data.message) {
+        notification.info({
+          message: '系统通知',
+          description: data.message,
+          placement: 'topRight',
+          duration: 4,
+        });
+      }
   }
 };
 
@@ -82,6 +156,9 @@ export async function getInitialState(): Promise<{
 
 // 退出登录
 const handleLogout = async (setInitialState: any) => {
+  // 断开SSE连接
+  sseClient.disconnect();
+
   localStorage.removeItem('token');
   localStorage.removeItem('userInfo');
   await setInitialState((s: any) => ({ ...s, currentUser: undefined }));
@@ -100,9 +177,23 @@ const SiderFooter: React.FC<{ collapsed?: boolean; currentUser: any; userRoles: 
 
   useEffect(() => {
     globalSetUnreadCount = setUnreadCount;
+
+    // 初始化时先获取一次未读数量
     refreshUnreadCount();
-    const timer = setInterval(refreshUnreadCount, 30000);
-    return () => clearInterval(timer);
+
+    // 建立SSE连接，监听所有类型的事件
+    sseClient.on('message', handleSseMessage);
+    sseClient.on('announcement', handleSseMessage);
+    sseClient.on('todo', handleSseMessage);
+    sseClient.connect();
+
+    // 组件卸载时断开SSE连接
+    return () => {
+      sseClient.off('message', handleSseMessage);
+      sseClient.off('announcement', handleSseMessage);
+      sseClient.off('todo', handleSseMessage);
+      sseClient.disconnect();
+    };
   }, []);
 
   if (!currentUser) return null;
