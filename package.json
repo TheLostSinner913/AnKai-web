@@ -11,8 +11,11 @@
     "start": "npm run dev"
   },
   "dependencies": {
+    "@ant-design/charts": "^2.6.6",
     "@ant-design/icons": "^5.0.1",
     "@ant-design/pro-components": "^2.4.4",
+    "@logicflow/core": "^2.2.0-alpha.0",
+    "@logicflow/extension": "^2.2.0-alpha.0",
     "@umijs/max": "^4.4.12",
     "antd": "^5.4.0"
   },

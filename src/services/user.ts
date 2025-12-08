@@ -16,6 +16,8 @@ export interface UserFormData {
   email?: string;
   phone?: string;
   realName?: string;
+  departmentId?: number;
+  position?: string;
   status?: number;
   remark?: string;
 }
@@ -27,6 +29,9 @@ export interface UserInfo {
   phone?: string;
   realName?: string;
   avatar?: string;
+  departmentId?: number;
+  departmentName?: string;
+  position?: string;
   status: number;
   createTime?: string;
   updateTime?: string;
@@ -53,6 +58,8 @@ export interface UserCreateRequest {
   phone?: string;
   realName?: string;
   avatar?: string;
+  departmentId?: number;
+  position?: string;
   status?: number;
   remark?: string;
 }
@@ -65,6 +72,8 @@ export interface UserEditRequest {
   phone?: string;
   realName?: string;
   avatar?: string;
+  departmentId?: number;
+  position?: string;
   status?: number;
   remark?: string;
 }

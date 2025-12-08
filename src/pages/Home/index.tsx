@@ -377,9 +377,9 @@ const HomePage: React.FC = () => {
           </div>
         </Col>
         <Col xs={12} sm={12} md={6}>
-          <div className={styles.statCard} style={{ borderLeft: '4px solid #faad14' }}>
-            <div className={styles.statIcon} style={{ background: 'rgba(250, 173, 20, 0.1)' }}>
-              <MailOutlined style={{ fontSize: 24, color: '#faad14' }} />
+          <div className={styles.statCard} style={{ borderLeft: '4px solid #fa8c16' }}>
+            <div className={styles.statIcon} style={{ background: 'rgba(250, 140, 22, 0.15)' }}>
+              <MailOutlined style={{ fontSize: 24, color: '#fa8c16' }} />
             </div>
             <Statistic title="未读消息" value={stats.unreadMessages || 0} valueStyle={{ color: '#262626' }} />
           </div>
@@ -602,7 +602,7 @@ const HomePage: React.FC = () => {
             <Select>
               <Select.Option value="#1890ff">🔵 蓝色</Select.Option>
               <Select.Option value="#52c41a">🟢 绿色</Select.Option>
-              <Select.Option value="#faad14">🟡 黄色</Select.Option>
+              <Select.Option value="#fa8c16">🟠 橙色</Select.Option>
               <Select.Option value="#ff4d4f">🔴 红色</Select.Option>
               <Select.Option value="#722ed1">🟣 紫色</Select.Option>
             </Select>

@@ -8,7 +8,7 @@ export default defineConfig({
         token: {
           colorPrimary: '#1890ff',
           colorSuccess: '#52c41a',
-          colorWarning: '#faad14',
+          colorWarning: '#fa8c16',
           colorError: '#ff4d4f',
           colorInfo: '#1890ff',
           colorBgLayout: '#d4d9e2',
@@ -95,6 +95,13 @@ export default defineConfig({
       access: 'canAccessPermission',
     },
     {
+      name: '部门管理',
+      path: '/department',
+      component: './Department',
+      icon: 'ApartmentOutlined',
+      access: 'canAccessDepartment',
+    },
+    {
       name: '公告管理',
       path: '/announcement',
       component: './Announcement',
@@ -112,6 +119,62 @@ export default defineConfig({
       path: '/profile',
       component: './Profile',
       hideInMenu: true, // 不在菜单中显示
+    },
+    {
+      name: '考勤管理',
+      path: '/attendance',
+      icon: 'CalendarOutlined',
+      routes: [
+        {
+          name: '我的考勤',
+          path: '/attendance/my',
+          component: './Attendance/MyAttendance',
+        },
+        {
+          name: '考勤统计',
+          path: '/attendance/management',
+          component: './Attendance/Management',
+        },
+      ],
+    },
+    {
+      name: '工作流',
+      path: '/workflow',
+      icon: 'ApartmentOutlined',
+      routes: [
+        {
+          name: '流程定义',
+          path: '/workflow/definition',
+          component: './Workflow/Definition',
+        },
+        {
+          name: '流程设计',
+          path: '/workflow/designer',
+          component: './Workflow/Designer',
+          hideInMenu: true,
+        },
+        {
+          name: '流程设计',
+          path: '/workflow/designer/:id',
+          component: './Workflow/Designer',
+          hideInMenu: true,
+        },
+        {
+          name: '待办任务',
+          path: '/workflow/task',
+          component: './Workflow/Task',
+        },
+        {
+          name: '我的流程',
+          path: '/workflow/my-process',
+          component: './Workflow/MyProcess',
+        },
+        {
+          name: '模块绑定',
+          path: '/workflow/module-binding',
+          component: './Workflow/ModuleBinding',
+        },
+      ],
     },
   ],
   npmClient: 'npm',

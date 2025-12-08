@@ -1,7 +1,8 @@
-import { ModalForm, ProFormSelect, ProFormText, ProFormTextArea } from '@ant-design/pro-components';
+import { ModalForm, ProFormSelect, ProFormText, ProFormTextArea, ProFormTreeSelect } from '@ant-design/pro-components';
 import { message, Alert } from 'antd';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { addUser, updateUser } from '@/services/user';
+import { getDepartmentOptions, type DepartmentTreeNode } from '@/services/department';
 import type { UserType } from '../index';
 
 interface UserFormProps {
@@ -11,6 +12,15 @@ interface UserFormProps {
   onFinish: () => void;
 }
 
+// 转换部门选项为 TreeSelect 格式
+const convertToTreeData = (options: DepartmentTreeNode[]): any[] => {
+  return options.map((item) => ({
+    title: item.departmentName,
+    value: item.id,
+    children: item.children && item.children.length > 0 ? convertToTreeData(item.children) : undefined,
+  }));
+};
+
 const UserForm: React.FC<UserFormProps> = ({
   open,
   onOpenChange,
@@ -19,6 +29,18 @@ const UserForm: React.FC<UserFormProps> = ({
 }) => {
   const isEdit = !!initialValues?.id;
   const [passwordChanged, setPasswordChanged] = useState(false);
+  const [departmentOptions, setDepartmentOptions] = useState<any[]>([]);
+
+  // 加载部门选项
+  useEffect(() => {
+    if (open) {
+      getDepartmentOptions().then((res) => {
+        if (res.code === 200 && res.data) {
+          setDepartmentOptions(convertToTreeData(res.data));
+        }
+      });
+    }
+  }, [open]);
 
   return (
     <ModalForm
@@ -147,6 +169,26 @@ const UserForm: React.FC<UserFormProps> = ({
         rules={[
           { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号格式' },
         ]}
+      />
+
+      <ProFormTreeSelect
+        name="departmentId"
+        label="所属部门"
+        placeholder="请选择所属部门"
+        allowClear
+        fieldProps={{
+          treeData: departmentOptions,
+          showSearch: true,
+          treeNodeFilterProp: 'title',
+          dropdownStyle: { maxHeight: 400, overflow: 'auto' },
+        }}
+      />
+
+      <ProFormText
+        name="position"
+        label="职位"
+        placeholder="请输入职位"
+        rules={[{ max: 50, message: '职位长度不能超过50个字符' }]}
       />
 
       <ProFormSelect

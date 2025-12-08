@@ -48,7 +48,7 @@ interface UserRoleDrawerProps {
 
 // 角色图标映射
 const roleIconMap: Record<string, React.ReactNode> = {
-  SUPER_ADMIN: <CrownOutlined style={{ color: '#faad14' }} />,
+  SUPER_ADMIN: <CrownOutlined style={{ color: '#fa8c16' }} />,
   ADMIN: <SafetyOutlined style={{ color: '#1890ff' }} />,
   DEPT_ADMIN: <TeamOutlined style={{ color: '#52c41a' }} />,
   USER: <UserOutlined style={{ color: '#722ed1' }} />,

@@ -86,6 +86,7 @@ export default (initialState: { currentUser?: any } | undefined) => {
 
     // 部门管理
     canAccessDept: () => hasModuleAccess('dept'),
+    canAccessDepartment: () => hasModuleAccess('dept'),
 
     // ==================== 操作权限（按钮级别） ====================
     // 通用权限检查函数，供页面组件使用
