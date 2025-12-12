@@ -51,10 +51,12 @@ import {
   deleteTodo,
   completeTodo,
   ignoreTodo,
+  unignoreTodo,
   Todo,
 } from '@/services/todo';
 import { getVisibleAnnouncements, Announcement } from '@/services/announcement';
 import styles from './index.less';
+import { wsClient, WebSocketEventData } from '@/utils/websocket';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -90,6 +92,30 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     loadTodoDates(selectedDate.year(), selectedDate.month() + 1);
   }, [selectedDate.year(), selectedDate.month()]);
+
+  // WebSocket 推送时自动刷新首页数据
+  useEffect(() => {
+    const handler = (data: WebSocketEventData) => {
+      if (data.type === 'new_announcement') {
+        // 新公告：刷新统计和首页公告列表
+        loadData();
+      }
+      if (data.type === 'new_todo') {
+        // 新待办：刷新统计、当日待办和日历标记
+        loadData();
+        loadTodos(selectedDate);
+        loadTodoDates(selectedDate.year(), selectedDate.month() + 1);
+      }
+    };
+
+    wsClient.on('new_announcement', handler);
+    wsClient.on('new_todo', handler);
+
+    return () => {
+      wsClient.off('new_announcement', handler);
+      wsClient.off('new_todo', handler);
+    };
+  }, [selectedDate]);
 
   const loadData = async () => {
     setLoading(true);
@@ -266,6 +292,16 @@ const HomePage: React.FC = () => {
     }
   };
 
+  // 取消忽略待办
+  const handleUnignoreTodo = async (id: number) => {
+    const res = await unignoreTodo(id);
+    if (res.code === 200) {
+      message.success('已取消忽略');
+      loadTodos(selectedDate);
+      loadData();
+    }
+  };
+
   // 优先级颜色
   const priorityColors: Record<number, string> = {
     1: 'default',
@@ -362,7 +398,14 @@ const HomePage: React.FC = () => {
               <UserOutlined style={{ fontSize: 24, color: '#1890ff' }} />
             </div>
             <Statistic
-              title={<span>用户总数 <span style={{ color: '#52c41a', fontSize: 12, marginLeft: 8 }}>在线: {stats.onlineUsers || 1}</span></span>}
+              title={
+                <span>
+                  用户总数
+                  <span style={{ color: '#52c41a', fontSize: 12, marginLeft: 8 }}>
+                    在线: {stats.onlineUsers ?? 0}
+                  </span>
+                </span>
+              }
               value={stats.totalUsers || 0}
               valueStyle={{ color: '#262626' }}
             />
@@ -444,7 +487,6 @@ const HomePage: React.FC = () => {
                 {todos.map((todo) => {
                   const isIgnored = todo.status === 4;
                   const isCompleted = todo.status === 2;
-                  const isFinished = isIgnored || isCompleted;
                   return (
                     <div
                       key={todo.id}
@@ -478,14 +520,47 @@ const HomePage: React.FC = () => {
                         )}
                       </div>
                       <div className={styles.todoActions}>
-                        {!isFinished && (
+                        {!isCompleted && (
                           <>
-                            <Tooltip title="完成">
-                              <Button type="text" size="small" icon={<CheckOutlined style={{ color: '#52c41a' }} />} onClick={() => handleCompleteTodo(todo.id!)} />
-                            </Tooltip>
-                            <Tooltip title="忽略">
-                              <Button type="text" size="small" icon={<EyeInvisibleOutlined style={{ color: '#8c8c8c' }} />} onClick={() => handleIgnoreTodo(todo.id!)} />
-                            </Tooltip>
+                            {isIgnored ? (
+                              <>
+                                <Tooltip title="取消忽略">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<EyeInvisibleOutlined style={{ color: '#1890ff' }} />}
+                                    onClick={() => handleUnignoreTodo(todo.id!)}
+                                  />
+                                </Tooltip>
+                                <Tooltip title="完成">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<CheckOutlined style={{ color: '#52c41a' }} />}
+                                    onClick={() => handleCompleteTodo(todo.id!)}
+                                  />
+                                </Tooltip>
+                              </>
+                            ) : (
+                              <>
+                                <Tooltip title="完成">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<CheckOutlined style={{ color: '#52c41a' }} />}
+                                    onClick={() => handleCompleteTodo(todo.id!)}
+                                  />
+                                </Tooltip>
+                                <Tooltip title="忽略">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<EyeInvisibleOutlined style={{ color: '#8c8c8c' }} />}
+                                    onClick={() => handleIgnoreTodo(todo.id!)}
+                                  />
+                                </Tooltip>
+                              </>
+                            )}
                           </>
                         )}
                         {!isIgnored && (

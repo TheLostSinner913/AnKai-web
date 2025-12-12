@@ -45,6 +45,15 @@ const AnnouncementPage: React.FC = () => {
     { label: '已撤回', value: 2, color: 'warning' },
   ];
 
+  const recentOptions = [
+    { label: '全部', value: undefined },
+    { label: '近3天', value: 3 },
+    { label: '近1周', value: 7 },
+    { label: '近1个月', value: 30 },
+    { label: '近3个月', value: 90 },
+    { label: '近半年', value: 180 },
+  ];
+
   const columns: ProColumns<Announcement>[] = [
     { title: 'ID', dataIndex: 'id', width: 60, hideInSearch: true },
     { title: '标题', dataIndex: 'title', ellipsis: true, width: 200 },
@@ -64,6 +73,22 @@ const AnnouncementPage: React.FC = () => {
         return <Tag color={opt?.color}>{opt?.label}</Tag>;
       },
     },
+    {
+      title: '是否过期', dataIndex: 'expireTime', width: 90, hideInSearch: true,
+      render: (_, record) => {
+        if (!record.expireTime) return '-';
+        const expired = dayjs(record.expireTime).isBefore(dayjs());
+        return <Tag color={expired ? 'red' : 'default'}>{expired ? '已过期' : '未过期'}</Tag>;
+      },
+    },
+    {
+      title: '时间范围', dataIndex: 'recentDays', hideInTable: true,
+      valueType: 'select',
+      fieldProps: {
+        options: recentOptions,
+        placeholder: '全部',
+      },
+    },
     { title: '置顶', dataIndex: 'isTop', width: 60, hideInSearch: true,
       render: (_, record) => record.isTop ? <Tag color="red">是</Tag> : '-',
     },
@@ -75,7 +100,7 @@ const AnnouncementPage: React.FC = () => {
       render: (_, record) => dayjs(record.createTime).format('YYYY-MM-DD HH:mm'),
     },
     {
-      title: '操作', valueType: 'option', width: 200, fixed: 'right',
+      title: '操作', valueType: 'option', width: 220, fixed: 'right',
       render: (_, record) => [
         record.status === 0 && canPublish && (
           <Button key="publish" type="link" size="small" icon={<SendOutlined />}
@@ -84,6 +109,10 @@ const AnnouncementPage: React.FC = () => {
         record.status === 1 && canPublish && (
           <Button key="withdraw" type="link" size="small" icon={<UndoOutlined />}
             onClick={() => handleWithdraw(record.id!)}>撤回</Button>
+        ),
+        record.status === 2 && canPublish && (
+          <Button key="republish" type="link" size="small" icon={<SendOutlined />}
+            onClick={() => handlePublish(record.id!)}>再次发布</Button>
         ),
         canEdit && (
           <Button key="edit" type="link" size="small" icon={<EditOutlined />}
@@ -177,6 +206,8 @@ const AnnouncementPage: React.FC = () => {
             size: params.pageSize,
             title: params.title,
             status: params.status,
+            announcementType: params.announcementType,
+            recentDays: params.recentDays,
           });
           return {
             data: res.data?.records || [],
@@ -191,6 +222,11 @@ const AnnouncementPage: React.FC = () => {
             </Button>
           ),
         ].filter(Boolean)}
+        search={{
+          labelWidth: 80,
+          defaultCollapsed: false,
+          collapsed: false,
+        }}
       />
 
       <Modal

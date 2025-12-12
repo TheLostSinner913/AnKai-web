@@ -12,6 +12,81 @@ import { wsClient, WebSocketEventData } from '@/utils/websocket';
 let globalUnreadCount = 0;
 let globalSetUnreadCount: ((count: number) => void) | null = null;
 
+// 浏览器标题闪烁相关
+let originalTitle = typeof document !== 'undefined' ? document.title : 'AnKai 管理系统';
+let titleBlinkTimer: number | null = null;
+
+const startTitleBlink = (text: string) => {
+  if (typeof document === 'undefined') return;
+  // 仅在页面不在前台时闪烁
+  if (!document.hidden) return;
+  if (titleBlinkTimer) return;
+  let flag = false;
+  titleBlinkTimer = window.setInterval(() => {
+    document.title = flag ? text : originalTitle;
+    flag = !flag;
+  }, 1000);
+};
+
+const stopTitleBlink = () => {
+  if (typeof document === 'undefined') return;
+  if (titleBlinkTimer) {
+    clearInterval(titleBlinkTimer);
+    titleBlinkTimer = null;
+  }
+  document.title = originalTitle;
+};
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      stopTitleBlink();
+    }
+  });
+}
+
+// 浏览器桌面通知
+const showBrowserNotification = (title: string, body: string, onClick?: () => void) => {
+  if (typeof window === 'undefined' || !("Notification" in window)) return;
+
+  const trigger = () => {
+    if (Notification.permission !== 'granted') return;
+    const n = new Notification(title, {
+      body,
+      icon: '/favicon.ico',
+    });
+    n.onclick = () => {
+      window.focus();
+      onClick && onClick();
+      n.close();
+    };
+  };
+
+  if (Notification.permission === 'granted') {
+    trigger();
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then((permission) => {
+      if (permission === 'granted') {
+        trigger();
+      }
+    });
+  }
+};
+
+// 简单声音提示（使用浏览器 Audio，对不支持或加载失败自动忽略）
+const playNotifySound = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const audio = new Audio('/notify.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(() => {
+      // 用户未交互前可能无法自动播放，忽略错误
+    });
+  } catch (e) {
+    // 忽略声音播放失败
+  }
+};
+
 // 刷新未读消息数量的函数（作为SSE连接前的初始化和备用）
 const refreshUnreadCount = async () => {
   try {
@@ -44,6 +119,11 @@ const handleWsMessage = (data: WebSocketEventData) => {
   switch (data.type) {
     case 'new_message':
       // 新站内信通知
+      playNotifySound();
+      startTitleBlink('【新消息】');
+      showBrowserNotification('新消息', `${msgData?.senderName || '某人'}: ${msgData?.content || data.message}`, () => {
+        history.push('/messages');
+      });
       notification.info({
         message: '新消息',
         description: `${msgData?.senderName || '某人'}: ${msgData?.content || data.message}`,
@@ -60,6 +140,11 @@ const handleWsMessage = (data: WebSocketEventData) => {
       // 新公告通知
       const announcementTypeText = msgData?.announcementType === 3 ? '【紧急】' :
         msgData?.announcementType === 2 ? '【重要】' : '';
+      playNotifySound();
+      startTitleBlink(`${announcementTypeText || ''}新公告` || '【新公告】');
+      showBrowserNotification(`${announcementTypeText}新公告`, msgData?.title || data.message, () => {
+        history.push('/');
+      });
       notification.warning({
         message: `${announcementTypeText}新公告`,
         description: msgData?.title || data.message,
@@ -76,6 +161,11 @@ const handleWsMessage = (data: WebSocketEventData) => {
       // 新待办事项通知
       const priorityText = msgData?.priority === 3 ? '【高优先级】' :
         msgData?.priority === 1 ? '【低优先级】' : '';
+      playNotifySound();
+      startTitleBlink(`${priorityText || ''}新待办` || '【新待办】');
+      showBrowserNotification(`${priorityText}新待办`, msgData?.title || data.message, () => {
+        history.push('/');
+      });
       notification.info({
         message: `${priorityText}新待办`,
         description: msgData?.title || data.message,
@@ -184,19 +274,13 @@ const SiderFooter: React.FC<{ collapsed?: boolean; currentUser: any; userRoles: 
 
     // 建立 WebSocket 连接，监听所有类型的事件
     wsClient.on('message', handleWsMessage);
-    wsClient.on('new_message', handleWsMessage);
     wsClient.on('unread_update', handleWsMessage);
-    wsClient.on('new_announcement', handleWsMessage);
-    wsClient.on('new_todo', handleWsMessage);
     wsClient.connect();
 
     // 组件卸载时断开 WebSocket 连接
     return () => {
       wsClient.off('message', handleWsMessage);
-      wsClient.off('new_message', handleWsMessage);
       wsClient.off('unread_update', handleWsMessage);
-      wsClient.off('new_announcement', handleWsMessage);
-      wsClient.off('new_todo', handleWsMessage);
       wsClient.disconnect();
     };
   }, []);

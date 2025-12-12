@@ -38,6 +38,8 @@ export async function getAnnouncementPage(params: {
   size?: number;
   title?: string;
   status?: number;
+  announcementType?: number;
+  recentDays?: number;
 }) {
   return get('/announcement/page', params);
 }

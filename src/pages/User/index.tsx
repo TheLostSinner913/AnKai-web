@@ -4,7 +4,7 @@ import { ProTable } from '@ant-design/pro-components';
 import { Button, message, Popconfirm, Space, Tag, Tooltip, Badge } from 'antd';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useModel } from '@umijs/max';
-import { deleteUser, getUserPageWithRoles, getOnlineUserIds, type UserWithRoles, type RoleInfo } from '@/services/user';
+import { deleteUser, getUserPageWithRoles, type UserWithRoles, type RoleInfo } from '@/services/user';
 import UserForm from './components/UserForm';
 import UserRoleDrawer from './components/UserRoleModal';
 import SendMessageModal from './components/SendMessageModal';
@@ -44,7 +44,6 @@ const UserList: React.FC = () => {
   const [roleModalOpen, setRoleModalOpen] = useState<boolean>(false);
   const [messageModalOpen, setMessageModalOpen] = useState<boolean>(false);
   const [currentRow, setCurrentRow] = useState<UserType>();
-  const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
   const actionRef = useRef<ActionType>();
 
   // 判断目标用户是否是超级管理员
@@ -60,25 +59,6 @@ const UserList: React.FC = () => {
     if (isAdmin && !isTargetSuperAdmin(record)) return true;
     return false;
   };
-
-  // 获取在线用户列表
-  const fetchOnlineUsers = useCallback(async () => {
-    try {
-      const response = await getOnlineUserIds();
-      if (response.code === 200 && response.data) {
-        setOnlineUserIds(new Set(response.data));
-      }
-    } catch (error) {
-      console.error('获取在线用户失败:', error);
-    }
-  }, []);
-
-  // 定时刷新在线状态
-  useEffect(() => {
-    fetchOnlineUsers();
-    const timer = setInterval(fetchOnlineUsers, 30000); // 每30秒刷新一次
-    return () => clearInterval(timer);
-  }, [fetchOnlineUsers]);
 
   /**
    * 删除用户
@@ -107,15 +87,24 @@ const UserList: React.FC = () => {
     },
     {
       title: '在线',
-      dataIndex: 'online',
-      key: 'online',
-      width: 70,
+      dataIndex: 'onlineStatus',
+      key: 'onlineStatus',
+      width: 90,
       search: false,
       render: (_, record) => {
-        const isOnline = onlineUserIds.has(record.id);
+        const status = record.onlineStatus || 'offline';
+        let badgeStatus: 'default' | 'success' | 'warning' = 'default';
+        let text = '离线';
+        if (status === 'online') {
+          badgeStatus = 'success';
+          text = '在线';
+        } else if (status === 'recent_active') {
+          badgeStatus = 'warning';
+          text = '刚刚活跃';
+        }
         return (
-          <Tooltip title={isOnline ? '在线' : '离线'}>
-            <Badge status={isOnline ? 'success' : 'default'} text={isOnline ? '在线' : '离线'} />
+          <Tooltip title={text}>
+            <Badge status={badgeStatus} text={text} />
           </Tooltip>
         );
       },
@@ -388,7 +377,7 @@ const UserList: React.FC = () => {
         receiverId={currentRow?.id}
         receiverName={currentRow?.realName || currentRow?.username}
         receiverAvatar={currentRow?.avatar}
-        online={currentRow?.id ? onlineUserIds.has(currentRow.id) : false}
+        online={currentRow?.onlineStatus === 'online'}
         onCancel={() => {
           setMessageModalOpen(false);
           setCurrentRow(undefined);

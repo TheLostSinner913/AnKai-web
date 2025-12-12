@@ -64,3 +64,8 @@ export async function ignoreTodo(id: number) {
   return put(`/todo/${id}/ignore`);
 }
 
+// 取消忽略待办
+export async function unignoreTodo(id: number) {
+  return put(`/todo/${id}/unignore`);
+}
+

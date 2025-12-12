@@ -33,6 +33,8 @@ export interface UserInfo {
   departmentName?: string;
   position?: string;
   status: number;
+  // 在线状态：online / recent_active / offline
+  onlineStatus?: 'online' | 'recent_active' | 'offline';
   createTime?: string;
   updateTime?: string;
   remark?: string;
