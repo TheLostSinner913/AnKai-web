@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Drawer, Input, Button, message, Avatar, Space, Spin, Badge, Empty } from 'antd';
 import { SendOutlined, UserOutlined } from '@ant-design/icons';
 import { sendMessage, getChatHistory, markChatAsRead, type Message } from '@/services/message';
+import { wsClient, type WebSocketEventData } from '@/utils/websocket';
 import { useModel } from '@umijs/max';
 import dayjs from 'dayjs';
 
@@ -63,6 +64,45 @@ const SendMessageModal: React.FC<SendMessageModalProps> = ({
       setInputValue('');
     }
   }, [visible, receiverId]);
+
+  // 直接从 wsClient 监听 WebSocket 事件，实现新消息到达时的自动刷新
+  useEffect(() => {
+    if (!visible || !receiverId) return;
+
+    const handler = (data: WebSocketEventData) => {
+      console.log('[SendMessageModal] 收到 WebSocket 事件:', data);
+
+      if (!data || data.type !== 'new_message') return;
+
+      const msgData: any = data.data || {};
+      const senderId: number | undefined = msgData.senderId;
+
+      // 只处理来自当前聊天对象的消息
+      if (senderId !== receiverId || !currentUser) return;
+
+      const newMsg: Message = {
+        id: msgData.messageId ?? Date.now(),
+        senderId,
+        senderName: msgData.senderName,
+        receiverId: currentUser.id,
+        receiverName: currentUser.realName || currentUser.username,
+        content: msgData.content,
+        messageType: 2,
+        isRead: 0,
+        createTime: new Date().toISOString(),
+      };
+
+      setMessages(prev => [...prev, newMsg]);
+
+      // 自动标记为已读
+      markChatAsRead(receiverId);
+    };
+
+    wsClient.on('new_message', handler);
+    return () => {
+      wsClient.off('new_message', handler);
+    };
+  }, [visible, receiverId, currentUser]);
 
   // 滚动到底部
   useEffect(() => {

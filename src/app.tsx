@@ -6,7 +6,7 @@ import { proLayoutSettings, colors } from '@/styles/theme';
 import { Avatar, Dropdown, message, Badge, Tooltip, notification } from 'antd';
 import { UserOutlined, LogoutOutlined, MailOutlined } from '@ant-design/icons';
 import React, { useState, useEffect } from 'react';
-import { sseClient, SseEventData } from '@/utils/sse';
+import { wsClient, WebSocketEventData } from '@/utils/websocket';
 
 // 全局未读消息数量
 let globalUnreadCount = 0;
@@ -27,15 +27,16 @@ const refreshUnreadCount = async () => {
   }
 };
 
-// SSE消息处理
-const handleSseMessage = (data: SseEventData) => {
-  console.log('[SSE] 收到推送:', data);
+// WebSocket 消息处理
+const handleWsMessage = (data: WebSocketEventData) => {
+  console.log('[WebSocket] 收到推送:', data);
 
   // 更新未读消息数（站内信）
   if (data.unreadCount !== undefined && globalSetUnreadCount) {
     globalUnreadCount = data.unreadCount;
     globalSetUnreadCount(data.unreadCount);
   }
+
 
   const msgData = data.data as any;
 
@@ -156,8 +157,8 @@ export async function getInitialState(): Promise<{
 
 // 退出登录
 const handleLogout = async (setInitialState: any) => {
-  // 断开SSE连接
-  sseClient.disconnect();
+  // 断开 WebSocket 连接
+  wsClient.disconnect();
 
   localStorage.removeItem('token');
   localStorage.removeItem('userInfo');
@@ -181,18 +182,22 @@ const SiderFooter: React.FC<{ collapsed?: boolean; currentUser: any; userRoles: 
     // 初始化时先获取一次未读数量
     refreshUnreadCount();
 
-    // 建立SSE连接，监听所有类型的事件
-    sseClient.on('message', handleSseMessage);
-    sseClient.on('announcement', handleSseMessage);
-    sseClient.on('todo', handleSseMessage);
-    sseClient.connect();
+    // 建立 WebSocket 连接，监听所有类型的事件
+    wsClient.on('message', handleWsMessage);
+    wsClient.on('new_message', handleWsMessage);
+    wsClient.on('unread_update', handleWsMessage);
+    wsClient.on('new_announcement', handleWsMessage);
+    wsClient.on('new_todo', handleWsMessage);
+    wsClient.connect();
 
-    // 组件卸载时断开SSE连接
+    // 组件卸载时断开 WebSocket 连接
     return () => {
-      sseClient.off('message', handleSseMessage);
-      sseClient.off('announcement', handleSseMessage);
-      sseClient.off('todo', handleSseMessage);
-      sseClient.disconnect();
+      wsClient.off('message', handleWsMessage);
+      wsClient.off('new_message', handleWsMessage);
+      wsClient.off('unread_update', handleWsMessage);
+      wsClient.off('new_announcement', handleWsMessage);
+      wsClient.off('new_todo', handleWsMessage);
+      wsClient.disconnect();
     };
   }, []);
 

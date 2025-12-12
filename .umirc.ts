@@ -180,6 +180,12 @@ export default defineConfig({
   npmClient: 'npm',
   // 配置代理，连接到SpringBoot后端
   proxy: {
+    // WebSocket 代理配置（必须放在 /api 之前）
+    '/api/ws': {
+      target: 'ws://localhost:8080',
+      changeOrigin: true,
+      ws: true,  // 启用 WebSocket 代理
+    },
     '/api': {
       target: 'http://localhost:8080',
       changeOrigin: true,

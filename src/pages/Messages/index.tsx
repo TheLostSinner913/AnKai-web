@@ -7,9 +7,11 @@ import {
   sendMessage,
   markChatAsRead,
   markAllAsRead,
+  getUnreadCount,
   type ChatSession,
   type Message,
 } from '@/services/message';
+import { wsClient, type WebSocketEventData } from '@/utils/websocket';
 import { useModel } from '@umijs/max';
 import dayjs from 'dayjs';
 
@@ -53,7 +55,9 @@ const MessagesPage: React.FC = () => {
           (a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime()
         );
         setMessages(sortedMessages);
+        // 标记已读（后端会通过 SSE 推送最新未读数）
         await markChatAsRead(session.userId);
+        // 本地更新会话列表的未读数
         setSessions(prev => prev.map(s =>
           s.userId === session.userId ? { ...s, unreadCount: 0 } : s
         ));
@@ -111,6 +115,66 @@ const MessagesPage: React.FC = () => {
   };
 
   const totalUnread = sessions.reduce((sum, s) => sum + s.unreadCount, 0);
+
+  // 直接从 wsClient 监听 WebSocket 事件，实现新消息到达时的自动刷新
+  useEffect(() => {
+    const handler = (data: WebSocketEventData) => {
+      console.log('[Messages] 收到 WebSocket 事件:', data);
+
+      if (!data) return;
+
+      // 处理未读数更新事件（标记已读后触发）
+      if (data.type === 'unread_update') {
+        // 刷新会话列表以同步未读数
+        loadSessions();
+        return;
+      }
+
+      // 处理新消息事件
+      if (data.type === 'new_message') {
+        const msgData: any = data.data || {};
+        const senderId: number | undefined = msgData.senderId;
+
+        // 总是刷新会话列表
+        loadSessions();
+
+        if (!senderId || !currentUser) {
+          return;
+        }
+
+        // 站内信 SSE 仅推送给接收方，因此会话对端即为发送方
+        const otherUserId = senderId;
+
+        // 如果当前打开的会话就是该对端，则把消息追加到当前聊天记录
+        if (selectedSession && selectedSession.userId === otherUserId) {
+          const newMsg: Message = {
+            id: msgData.messageId ?? Date.now(),
+            senderId,
+            senderName: msgData.senderName,
+            receiverId: currentUser.id,
+            receiverName: currentUser.realName || currentUser.username,
+            content: msgData.content,
+            messageType: 2,
+            isRead: 0,
+            createTime: new Date().toISOString(),
+          };
+
+          setMessages(prev => [...prev, newMsg]);
+
+          // 当前会话收到新消息，自动标记为已读
+          markChatAsRead(otherUserId);
+        }
+      }
+    };
+
+    // 直接从 wsClient 订阅事件
+    wsClient.on('new_message', handler);
+    wsClient.on('unread_update', handler);
+    return () => {
+      wsClient.off('new_message', handler);
+      wsClient.off('unread_update', handler);
+    };
+  }, [currentUser, selectedSession]);
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 48px)', background: '#f0f2f5' }}>
