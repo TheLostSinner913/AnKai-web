@@ -2,9 +2,11 @@ import { get, post, put, del, ApiResponse, PageResult, PageParams } from '@/util
 
 export interface UserPageParams extends PageParams {
   username?: string;
-  email?: string;
-  realName?: string;
+  phone?: string;
   status?: number;
+  roleIds?: number[];
+  departmentIds?: number[];
+  onlineStatus?: 'online' | 'recent_active' | 'offline';
   sortField?: string;
   sortOrder?: string;
 }

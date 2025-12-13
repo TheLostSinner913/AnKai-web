@@ -126,12 +126,6 @@ const ProfilePage: React.FC = () => {
                   {currentUser.status === 1 ? '正常' : '禁用'}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="登录次数">
-                {currentUser.loginCount || 0} 次
-              </Descriptions.Item>
-              <Descriptions.Item label="最后登录">
-                {currentUser.lastLoginTime || '-'}
-              </Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>

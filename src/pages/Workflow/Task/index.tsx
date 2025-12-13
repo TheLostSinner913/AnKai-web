@@ -1,11 +1,12 @@
 import { PageContainer, ProTable } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
-import { Button, message, Space, Tag, Tabs } from 'antd';
-import { useRef, useState } from 'react';
-import { history } from '@umijs/max';
+import { Button, message, Space, Tag, Tabs, Tooltip } from 'antd';
+import { useRef, useState, useEffect } from 'react';
+import { history, useModel } from '@umijs/max';
 import { CheckOutlined, CloseOutlined, EyeOutlined } from '@ant-design/icons';
 import { pageMyPending, pageMyCompleted } from '@/services/workflow';
 import ApproveModal from './components/ApproveModal';
+import TaskDetailModal from './components/TaskDetailModal';
 
 const statusMap: Record<number, { text: string; color: string }> = {
   0: { text: '待审批', color: 'processing' },
@@ -22,6 +23,39 @@ const TaskList: React.FC = () => {
   const [approveModalVisible, setApproveModalVisible] = useState(false);
   const [currentTask, setCurrentTask] = useState<API.WfTaskAssignee | null>(null);
   const [approveType, setApproveType] = useState<'approve' | 'reject'>('approve');
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [detailAssigneeId, setDetailAssigneeId] = useState<number | null>(null);
+
+  const { initialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
+  const userRoles = currentUser?.roles || [];
+  const permissions = currentUser?.permissions || [];
+
+  // 超级管理员拥有所有权限
+  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+
+  // 权限检查
+  const hasPermission = (code: string) => {
+    if (isSuperAdmin) return true;
+    return permissions.includes(code) || permissions.includes(`workflow:${code}`);
+  };
+
+  const canApprove = hasPermission('task:approve');
+  const canReject = hasPermission('task:reject');
+
+  // 监听 WebSocket 推送的新任务事件
+  useEffect(() => {
+    const handleTaskUpdate = () => {
+      pendingRef.current?.reload();
+      completedRef.current?.reload();
+    };
+    window.addEventListener('workflow_task_update', handleTaskUpdate);
+    window.addEventListener('workflow_status_update', handleTaskUpdate);
+    return () => {
+      window.removeEventListener('workflow_task_update', handleTaskUpdate);
+      window.removeEventListener('workflow_status_update', handleTaskUpdate);
+    };
+  }, []);
 
   const handleApprove = (record: API.WfTaskAssignee) => {
     setCurrentTask(record);
@@ -40,6 +74,11 @@ const TaskList: React.FC = () => {
     setCurrentTask(null);
     pendingRef.current?.reload();
     completedRef.current?.reload();
+  };
+
+  const handleViewDetail = (assigneeId: number) => {
+    setDetailAssigneeId(assigneeId);
+    setDetailModalVisible(true);
   };
 
   const pendingColumns: ProColumns<API.WfTaskAssignee>[] = [
@@ -72,34 +111,37 @@ const TaskList: React.FC = () => {
     {
       title: '操作',
       valueType: 'option',
-      width: 200,
+      width: 120,
       render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => history.push(`/workflow/task/${record.id}`)}
-          >
-            查看
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<CheckOutlined />}
-            onClick={() => handleApprove(record)}
-          >
-            通过
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<CloseOutlined />}
-            onClick={() => handleReject(record)}
-          >
-            拒绝
-          </Button>
+        <Space size={4}>
+          <Tooltip title="查看">
+            <Button
+              type="text"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => handleViewDetail(record.id!)}
+            />
+          </Tooltip>
+          {canApprove && (
+            <Tooltip title="通过">
+              <Button
+                type="text"
+                size="small"
+                icon={<CheckOutlined style={{ color: '#52c41a' }} />}
+                onClick={() => handleApprove(record)}
+              />
+            </Tooltip>
+          )}
+          {canReject && (
+            <Tooltip title="拒绝">
+              <Button
+                type="text"
+                size="small"
+                icon={<CloseOutlined style={{ color: '#ff4d4f' }} />}
+                onClick={() => handleReject(record)}
+              />
+            </Tooltip>
+          )}
         </Space>
       ),
     },
@@ -149,16 +191,16 @@ const TaskList: React.FC = () => {
     {
       title: '操作',
       valueType: 'option',
-      width: 80,
+      width: 60,
       render: (_, record) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<EyeOutlined />}
-          onClick={() => history.push(`/workflow/task/${record.id}`)}
-        >
-          查看
-        </Button>
+        <Tooltip title="查看">
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewDetail(record.id!)}
+          />
+        </Tooltip>
       ),
     },
   ];
@@ -226,6 +268,12 @@ const TaskList: React.FC = () => {
         type={approveType}
         onCancel={() => setApproveModalVisible(false)}
         onSuccess={handleApproveSuccess}
+      />
+
+      <TaskDetailModal
+        visible={detailModalVisible}
+        assigneeId={detailAssigneeId}
+        onClose={() => setDetailModalVisible(false)}
       />
     </PageContainer>
   );

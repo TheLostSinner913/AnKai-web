@@ -7,6 +7,11 @@ export async function submitLeave(data: API.LeaveApplication) {
   return post('/attendance/leave', data);
 }
 
+/** 更新并重新提交请假申请（编辑撤回的申请） */
+export async function updateAndResubmitLeave(id: number, data: API.LeaveApplication) {
+  return put(`/attendance/leave/${id}/resubmit`, data);
+}
+
 /** 撤回请假申请 */
 export async function withdrawLeave(id: number) {
   return post(`/attendance/leave/${id}/withdraw`);

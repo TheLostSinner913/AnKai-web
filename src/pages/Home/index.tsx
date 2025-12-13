@@ -55,6 +55,8 @@ import {
   Todo,
 } from '@/services/todo';
 import { getVisibleAnnouncements, Announcement } from '@/services/announcement';
+import { pageMyPending } from '@/services/workflow';
+import { history } from '@umijs/max';
 import styles from './index.less';
 import { wsClient, WebSocketEventData } from '@/utils/websocket';
 
@@ -74,6 +76,7 @@ const HomePage: React.FC = () => {
   const [todoDates, setTodoDates] = useState<string[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [workflowTasks, setWorkflowTasks] = useState<any[]>([]);
   const [todoModalVisible, setTodoModalVisible] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [form] = Form.useForm();
@@ -130,6 +133,9 @@ const HomePage: React.FC = () => {
       if (statsRes.code === 200) setStats(statsRes.data);
       if (announcementRes.code === 200) setAnnouncements(announcementRes.data || []);
 
+      // 加载工作流待办任务
+      loadWorkflowTasks();
+      
       // 加载天气（使用免费API）
       loadWeather();
     } catch (error) {
@@ -177,6 +183,17 @@ const HomePage: React.FC = () => {
       }
     } catch (error) {
       console.error('加载待办失败:', error);
+    }
+  };
+
+  const loadWorkflowTasks = async () => {
+    try {
+      const res = await pageMyPending({ page: 1, size: 5 });
+      if (res.code === 200) {
+        setWorkflowTasks(res.data?.records || []);
+      }
+    } catch (error) {
+      console.error('加载工作流待办失败:', error);
     }
   };
 
@@ -463,23 +480,82 @@ const HomePage: React.FC = () => {
           </Card>
         </Col>
 
-        {/* 待办事项 */}
+        {/* 待办区域 */}
         <Col xs={24} md={14} lg={16}>
-          <Card
-            title={
-              <span>
-                <CheckSquareOutlined style={{ marginRight: 8 }} />
-                待办事项 - {selectedDate.format('MM月DD日')}
-              </span>
-            }
-            extra={
-              <Button type="primary" size="small" icon={<PlusOutlined />} onClick={openAddTodoModal}>
-                添加
-              </Button>
-            }
-            className={styles.todoCard}
-            bodyStyle={{ padding: '12px 16px', maxHeight: 340, overflowY: 'auto' }}
-          >
+          <Row gutter={[0, 16]}>
+            {/* 工作流待办任务 */}
+            <Col span={24}>
+              <Card
+                title={
+                  <span>
+                    <BellOutlined style={{ marginRight: 8 }} />
+                    待办任务
+                    {stats.workflowTasks > 0 && (
+                      <Tag color="red" style={{ marginLeft: 8 }}>{stats.workflowTasks}</Tag>
+                    )}
+                  </span>
+                }
+                extra={
+                  <Button type="link" size="small" onClick={() => history.push('/workflow/task')}>
+                    查看全部
+                  </Button>
+                }
+                className={styles.todoCard}
+                bodyStyle={{ padding: '12px 16px', maxHeight: 160, overflowY: 'auto' }}
+              >
+                {workflowTasks.length === 0 ? (
+                  <Empty description="暂无待办任务" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '20px 0' }} />
+                ) : (
+                  <div className={styles.todoList}>
+                    {workflowTasks.map((task: any) => (
+                      <div
+                        key={task.id}
+                        className={styles.todoItem}
+                        style={{ borderLeftColor: '#fa8c16', cursor: 'pointer' }}
+                        onClick={() => history.push('/workflow/task')}
+                      >
+                        <div className={styles.todoContent}>
+                          <div className={styles.todoHeader}>
+                            <span className={styles.todoTitle}>
+                              {task.instance?.title || '待办任务'}
+                            </span>
+                            <div className={styles.todoTags}>
+                              <Tag color="blue">{task.instance?.processName || '流程'}</Tag>
+                              <Tag color="orange">{task.task?.nodeName || '审批'}</Tag>
+                            </div>
+                          </div>
+                          <div className={styles.todoMeta}>
+                            <span>发起人：{task.instance?.starterName || '未知'}</span>
+                            <span style={{ marginLeft: 12 }}>
+                              <ClockCircleOutlined style={{ marginRight: 4 }} />
+                              {task.createTime ? dayjs(task.createTime).format('MM-DD HH:mm') : ''}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </Col>
+            
+            {/* 日历待办事项 */}
+            <Col span={24}>
+              <Card
+                title={
+                  <span>
+                    <CheckSquareOutlined style={{ marginRight: 8 }} />
+                    待办事项 - {selectedDate.format('MM月DD日')}
+                  </span>
+                }
+                extra={
+                  <Button type="primary" size="small" icon={<PlusOutlined />} onClick={openAddTodoModal}>
+                    添加
+                  </Button>
+                }
+                className={styles.todoCard}
+                bodyStyle={{ padding: '12px 16px', maxHeight: 180, overflowY: 'auto' }}
+              >
             {todos.length === 0 ? (
               <Empty description="暂无待办事项" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '40px 0' }} />
             ) : (
@@ -577,7 +653,9 @@ const HomePage: React.FC = () => {
                 })}
               </div>
             )}
-          </Card>
+              </Card>
+            </Col>
+          </Row>
         </Col>
       </Row>
 

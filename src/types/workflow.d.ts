@@ -156,6 +156,7 @@ declare namespace API {
     instanceId?: number;
     createTime?: string;
     updateTime?: string;
+    attachmentIds?: number[];
   }
 
   /** 工作流模块绑定 */

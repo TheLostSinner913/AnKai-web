@@ -24,14 +24,22 @@ const AnnouncementPage: React.FC = () => {
   const [form] = Form.useForm();
   const { initialState } = useModel('@@initialState');
   const currentUser = initialState?.currentUser;
+  const userRoles = currentUser?.roles || [];
   const permissions = currentUser?.permissions || [];
 
-  // 权限检查
-  const hasPermission = (code: string) => permissions.includes(code);
-  const canAdd = hasPermission('system:announcement:add');
-  const canEdit = hasPermission('system:announcement:edit');
-  const canDelete = hasPermission('system:announcement:delete');
-  const canPublish = hasPermission('system:announcement:publish');
+  // 超级管理员拥有所有权限
+  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+
+  // 权限检查（支持 announcement:add 和 system:announcement:add 两种格式）
+  const hasPermission = (code: string) => {
+    if (isSuperAdmin) return true;
+    return permissions.includes(code) || permissions.includes(`system:${code}`);
+  };
+
+  const canAdd = hasPermission('announcement:add');
+  const canEdit = hasPermission('announcement:edit');
+  const canDelete = hasPermission('announcement:delete');
+  const canPublish = hasPermission('announcement:publish');
 
   const typeOptions = [
     { label: '普通', value: 1, color: 'default' },

@@ -124,16 +124,19 @@ export default defineConfig({
       name: '考勤管理',
       path: '/attendance',
       icon: 'CalendarOutlined',
+      access: 'canAccessAttendance',
       routes: [
         {
           name: '我的考勤',
           path: '/attendance/my',
           component: './Attendance/MyAttendance',
+          access: 'canAccessAttendanceMy',
         },
         {
           name: '考勤统计',
           path: '/attendance/management',
           component: './Attendance/Management',
+          access: 'canAccessAttendanceManagement',
         },
       ],
     },
@@ -141,11 +144,13 @@ export default defineConfig({
       name: '工作流',
       path: '/workflow',
       icon: 'ApartmentOutlined',
+      access: 'canAccessWorkflow',
       routes: [
         {
           name: '流程定义',
           path: '/workflow/definition',
           component: './Workflow/Definition',
+          access: 'canAccessWorkflowDefinition',
         },
         {
           name: '流程设计',
@@ -163,16 +168,19 @@ export default defineConfig({
           name: '待办任务',
           path: '/workflow/task',
           component: './Workflow/Task',
+          access: 'canAccessWorkflowTask',
         },
         {
           name: '我的流程',
           path: '/workflow/my-process',
           component: './Workflow/MyProcess',
+          access: 'canAccessWorkflowMyProcess',
         },
         {
           name: '模块绑定',
           path: '/workflow/module-binding',
           component: './Workflow/ModuleBinding',
+          access: 'canAccessWorkflowModuleBinding',
         },
       ],
     },

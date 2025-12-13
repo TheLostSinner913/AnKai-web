@@ -105,6 +105,7 @@ const refreshUnreadCount = async () => {
 // WebSocket 消息处理
 const handleWsMessage = (data: WebSocketEventData) => {
   console.log('[WebSocket] 收到推送:', data);
+  console.log('[WebSocket] 消息类型:', data.type);
 
   // 更新未读消息数（站内信）
   if (data.unreadCount !== undefined && globalSetUnreadCount) {
@@ -176,6 +177,48 @@ const handleWsMessage = (data: WebSocketEventData) => {
           notification.destroy();
         },
       });
+      break;
+
+    case 'new_workflow_task':
+      // 新工作流任务通知
+      playNotifySound();
+      startTitleBlink('【新审批】');
+      showBrowserNotification('新审批任务', data.message || '您有一个新的审批任务', () => {
+        history.push('/workflow/task');
+      });
+      notification.info({
+        message: '新审批任务',
+        description: data.message || '您有一个新的审批任务',
+        placement: 'topRight',
+        duration: 5,
+        onClick: () => {
+          history.push('/workflow/task');
+          notification.destroy();
+        },
+      });
+      // 触发全局事件，让页面刷新列表
+      window.dispatchEvent(new CustomEvent('workflow_task_update'));
+      break;
+
+    case 'workflow_status_update':
+      // 工作流状态更新通知（审批通过/拒绝/撤回等）
+      console.log('[app.tsx] 处理 workflow_status_update 事件，准备分发到页面');
+      playNotifySound();
+      const action = msgData?.action;
+      const notificationType = action === 'approved' ? 'success' : action === 'rejected' ? 'error' : 'info';
+      notification[notificationType]({
+        message: '审批状态更新',
+        description: data.message,
+        placement: 'topRight',
+        duration: 5,
+        onClick: () => {
+          history.push('/attendance/my');
+          notification.destroy();
+        },
+      });
+      // 触发全局事件，让页面刷新列表
+      console.log('[app.tsx] 分发 workflow_status_update 事件到 window');
+      window.dispatchEvent(new CustomEvent('workflow_status_update', { detail: msgData }));
       break;
 
     default:
@@ -305,10 +348,20 @@ const SiderFooter: React.FC<{ collapsed?: boolean; currentUser: any; userRoles: 
   ];
 
   const getRoleText = () => {
+    // 优先使用后端返回的角色名称列表（例如：后勤管理员）
+    if (currentUser?.roleNames && Array.isArray(currentUser.roleNames) && currentUser.roleNames.length > 0) {
+      return currentUser.roleNames.join('、');
+    }
+
+    // 兼容旧逻辑：根据角色编码推断
     if (userRoles.includes('SUPER_ADMIN')) return '超级管理员';
     if (userRoles.includes('ADMIN')) return '管理员';
     if (userRoles.includes('DEPT_ADMIN')) return '部门管理员';
     if (userRoles.includes('USER')) return '普通用户';
+
+    // 如果有自定义角色编码但不在上述列表中，直接显示第一个编码，避免误判为访客
+    if (userRoles.length > 0) return userRoles[0];
+
     return '访客';
   };
 
@@ -388,7 +441,7 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
     // 底部版权信息
     footerRender: () => (
       <div style={{ textAlign: 'center', padding: '24px 0', color: colors.textSecondary, fontSize: '14px', background: 'linear-gradient(to right, #f8fafc, #f1f5f9)', borderTop: '1px solid #e5e7eb' }}>
-        <span style={{ fontWeight: 500 }}>AnKai 管理系统</span> ©2025 Created with ❤️ by AnKai
+        <span style={{ fontWeight: 500 }}>AnKai 管理系统</span> ©2025 Created with ❤️ by LDQ
       </div>
     ),
 

@@ -1,11 +1,14 @@
 import { PageContainer } from '@ant-design/pro-components';
-import { Button, Card, Col, Row, Statistic, Table, Tag, Modal, Form, Input, DatePicker, Select, message, Popconfirm, Space, Empty, Alert } from 'antd';
-import { PlusOutlined, EyeOutlined, RollbackOutlined, CalendarOutlined } from '@ant-design/icons';
+import { Button, Card, Col, Row, Statistic, Table, Tag, Modal, Form, Input, DatePicker, Select, message, Popconfirm, Space, Empty, Alert, Upload, Tooltip } from 'antd';
+import { PlusOutlined, EyeOutlined, RollbackOutlined, CalendarOutlined, UploadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
-import { history } from '@umijs/max';
+import { history, useModel } from '@umijs/max';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { pageMyLeave, getMyLeaveStats, submitLeave, withdrawLeave, checkLeaveWorkflow } from '@/services/attendance';
+import { pageMyLeave, getMyLeaveStats, submitLeave, withdrawLeave, checkLeaveWorkflow, updateAndResubmitLeave } from '@/services/attendance';
+import { uploadFile } from '@/services/file';
+import type { UploadFile } from 'antd/es/upload/interface';
+import LeaveDetailModal from './components/LeaveDetailModal';
 
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
@@ -43,11 +46,58 @@ const MyAttendance: React.FC = () => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [workflowBound, setWorkflowBound] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [detailInstanceId, setDetailInstanceId] = useState<number | null>(null);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [attachmentIds, setAttachmentIds] = useState<number[]>([]);
+  const [editingRecord, setEditingRecord] = useState<API.LeaveApplication | null>(null);
+
+  const { initialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
+  const userRoles = currentUser?.roles || [];
+  const permissions = currentUser?.permissions || [];
+
+  // 超级管理员拥有所有权限
+  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+
+  // 权限检查
+  const hasPermission = (code: string) => {
+    if (isSuperAdmin) return true;
+    return permissions.includes(code) || permissions.includes(`attendance:${code}`);
+  };
+
+  const canApply = hasPermission('leave:apply');
+  const canWithdraw = hasPermission('leave:withdraw');
 
   useEffect(() => {
     checkWorkflow();
     loadData();
     loadStats();
+  }, [page, pageSize]);
+
+  // 监听 WebSocket 推送的工作流状态更新事件
+  useEffect(() => {
+    const handleWorkflowUpdate = async () => {
+      console.log('[MyAttendance] 收到 workflow_status_update 事件，刷新数据');
+      // 直接调用 API 刷新数据，避免闭包问题
+      try {
+        const res = await pageMyLeave({ page, size: pageSize });
+        if (res.code === 200) {
+          setData(res.data?.records || []);
+          setTotal(res.data?.total || 0);
+        }
+        const statsRes = await getMyLeaveStats();
+        if (statsRes.code === 200) {
+          setStats(statsRes.data || {});
+        }
+      } catch (error) {
+        console.error('刷新数据失败', error);
+      }
+    };
+    window.addEventListener('workflow_status_update', handleWorkflowUpdate);
+    return () => {
+      window.removeEventListener('workflow_status_update', handleWorkflowUpdate);
+    };
   }, [page, pageSize]);
 
   const checkWorkflow = async () => {
@@ -87,25 +137,53 @@ const MyAttendance: React.FC = () => {
     }
   };
 
+  const handleUpload = async (file: File) => {
+    try {
+      const res = await uploadFile(file);
+      if (res.code === 200) {
+        setAttachmentIds(prev => [...prev, res.data.id]);
+        return res.data;
+      }
+      message.error('上传失败');
+      return false;
+    } catch (error) {
+      message.error('上传失败');
+      return false;
+    }
+  };
+
   const handleSubmit = async (values: any) => {
     setSubmitting(true);
     try {
       const [startDate, endDate] = values.dateRange;
       const days = endDate.diff(startDate, 'day') + 1;
       
-      const res = await submitLeave({
+      const leaveData = {
         leaveType: values.leaveType,
         startDate: startDate.format('YYYY-MM-DD'),
         endDate: endDate.format('YYYY-MM-DD'),
         days,
         reason: values.reason,
-        userName: '当前用户', // TODO: 从用户信息获取
-      });
+        userName: currentUser?.realName || currentUser?.username || '未知用户',
+        attachmentIds: attachmentIds,
+      };
+
+      let res;
+      if (editingRecord) {
+        // 编辑模式：更新并重新提交
+        res = await updateAndResubmitLeave(editingRecord.id!, leaveData);
+      } else {
+        // 新建模式
+        res = await submitLeave(leaveData);
+      }
       
       if (res.code === 200) {
-        message.success('请假申请提交成功');
+        message.success(editingRecord ? '请假申请已重新提交' : '请假申请提交成功');
         setModalVisible(false);
         form.resetFields();
+        setFileList([]);
+        setAttachmentIds([]);
+        setEditingRecord(null);
         loadData();
         loadStats();
       } else {
@@ -116,6 +194,16 @@ const MyAttendance: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEdit = (record: API.LeaveApplication) => {
+    setEditingRecord(record);
+    form.setFieldsValue({
+      leaveType: record.leaveType,
+      dateRange: [dayjs(record.startDate), dayjs(record.endDate)],
+      reason: record.reason,
+    });
+    setModalVisible(true);
   };
 
   const handleWithdraw = async (id: number) => {
@@ -166,15 +254,22 @@ const MyAttendance: React.FC = () => {
     { title: '申请时间', dataIndex: 'createTime', width: 170 },
     {
       title: '操作',
-      width: 120,
+      width: 100,
       render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => history.push(`/workflow/instance/${record.instanceId}`)}>
-            查看
-          </Button>
-          {record.status === 1 && (
+        <Space size={4}>
+          <Tooltip title="查看">
+            <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => { setDetailInstanceId(record.instanceId!); setDetailModalVisible(true); }} />
+          </Tooltip>
+          {record.status === 4 && (
+            <Tooltip title="编辑">
+              <Button type="text" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+            </Tooltip>
+          )}
+          {canWithdraw && record.status === 1 && (
             <Popconfirm title="确定撤回该申请吗？" onConfirm={() => handleWithdraw(record.id!)}>
-              <Button type="link" size="small" icon={<RollbackOutlined />}>撤回</Button>
+              <Tooltip title="撤回">
+                <Button type="text" size="small" icon={<RollbackOutlined />} />
+              </Tooltip>
             </Popconfirm>
           )}
         </Space>
@@ -221,11 +316,11 @@ const MyAttendance: React.FC = () => {
       {/* 请假列表 */}
       <Card
         title="我的请假记录"
-        extra={
+        extra={canApply ? (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalVisible(true)} disabled={!workflowBound}>
             申请请假
           </Button>
-        }
+        ) : null}
       >
         <Table
           columns={columns}
@@ -245,9 +340,9 @@ const MyAttendance: React.FC = () => {
 
       {/* 申请请假弹窗 */}
       <Modal
-        title="申请请假"
+        title={editingRecord ? "编辑请假申请" : "申请请假"}
         open={modalVisible}
-        onCancel={() => { setModalVisible(false); form.resetFields(); }}
+        onCancel={() => { setModalVisible(false); form.resetFields(); setEditingRecord(null); setFileList([]); setAttachmentIds([]); }}
         footer={null}
         width={500}
       >
@@ -261,14 +356,38 @@ const MyAttendance: React.FC = () => {
           <Form.Item name="reason" label="请假原因" rules={[{ required: true, message: '请输入请假原因' }]}>
             <TextArea rows={4} placeholder="请输入请假原因" maxLength={500} showCount />
           </Form.Item>
+          <Form.Item label="附件">
+            <Upload
+              fileList={fileList}
+              beforeUpload={async (file) => {
+                const result = await handleUpload(file);
+                if (result) {
+                  setFileList(prev => [...prev, { uid: result.id.toString(), name: file.name, status: 'done' }]);
+                }
+                return false;
+              }}
+              onRemove={(file) => {
+                setFileList(prev => prev.filter(f => f.uid !== file.uid));
+                setAttachmentIds(prev => prev.filter(id => id.toString() !== file.uid));
+              }}
+            >
+              <Button icon={<UploadOutlined />}>上传附件</Button>
+            </Upload>
+          </Form.Item>
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button onClick={() => { setModalVisible(false); form.resetFields(); }}>取消</Button>
-              <Button type="primary" htmlType="submit" loading={submitting}>提交申请</Button>
+              <Button onClick={() => { setModalVisible(false); form.resetFields(); setEditingRecord(null); setFileList([]); setAttachmentIds([]); }}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={submitting}>{editingRecord ? '保存' : '提交申请'}</Button>
             </Space>
           </Form.Item>
         </Form>
       </Modal>
+
+      <LeaveDetailModal
+        visible={detailModalVisible}
+        instanceId={detailInstanceId}
+        onClose={() => setDetailModalVisible(false)}
+      />
     </PageContainer>
   );
 };

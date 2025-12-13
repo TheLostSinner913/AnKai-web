@@ -2,6 +2,7 @@ import { PageContainer } from '@ant-design/pro-components';
 import { Card, Table, Tag, Button, Modal, Form, Select, Switch, message, Space } from 'antd';
 import { EditOutlined, LinkOutlined, DisconnectOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
+import { useModel } from '@umijs/max';
 import type { ColumnsType } from 'antd/es/table';
 import { getModuleBindings, saveModuleBinding } from '@/services/attendance';
 import { getProcessDefinitionList } from '@/services/workflow';
@@ -22,6 +23,22 @@ const ModuleBinding: React.FC = () => {
   const [form] = Form.useForm();
   const [processList, setProcessList] = useState<API.WfProcessDefinition[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  const { initialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
+  const userRoles = currentUser?.roles || [];
+  const permissions = currentUser?.permissions || [];
+
+  // 超级管理员拥有所有权限
+  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+
+  // 权限检查
+  const hasPermission = (code: string) => {
+    if (isSuperAdmin) return true;
+    return permissions.includes(code) || permissions.includes(`workflow:${code}`);
+  };
+
+  const canEdit = hasPermission('module-binding:edit');
 
   useEffect(() => {
     loadData();
@@ -141,11 +158,11 @@ const ModuleBinding: React.FC = () => {
     {
       title: '操作',
       width: 100,
-      render: (_, record) => (
+      render: (_, record) => canEdit ? (
         <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
           配置
         </Button>
-      ),
+      ) : null,
     },
   ];
 

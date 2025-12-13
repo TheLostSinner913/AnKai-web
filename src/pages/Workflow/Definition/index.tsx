@@ -2,7 +2,7 @@ import { PageContainer, ProTable } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { Button, message, Popconfirm, Space, Tag } from 'antd';
 import { useRef } from 'react';
-import { history } from '@umijs/max';
+import { history, useModel } from '@umijs/max';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, PlayCircleOutlined, StopOutlined } from '@ant-design/icons';
 import { pageDefinitions, deleteDefinition, publishDefinition, disableDefinition, copyDefinition } from '@/services/workflow';
 
@@ -14,6 +14,26 @@ const statusMap: Record<number, { text: string; color: string }> = {
 
 const DefinitionList: React.FC = () => {
   const actionRef = useRef<ActionType>();
+  const { initialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
+  const userRoles = currentUser?.roles || [];
+  const permissions = currentUser?.permissions || [];
+
+  // 超级管理员拥有所有权限
+  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+
+  // 权限检查
+  const hasPermission = (code: string) => {
+    if (isSuperAdmin) return true;
+    return permissions.includes(code) || permissions.includes(`workflow:${code}`);
+  };
+
+  const canAdd = hasPermission('definition:add');
+  const canEdit = hasPermission('definition:edit');
+  const canDelete = hasPermission('definition:delete');
+  const canPublish = hasPermission('definition:publish');
+  const canDisable = hasPermission('definition:disable');
+  const canCopy = hasPermission('definition:copy');
 
   const handlePublish = async (id: number) => {
     try {
@@ -108,15 +128,17 @@ const DefinitionList: React.FC = () => {
       width: 280,
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => history.push(`/workflow/designer/${record.id}`)}
-          >
-            编辑
-          </Button>
-          {record.status === 0 && (
+          {canEdit && (
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => history.push(`/workflow/designer/${record.id}`)}
+            >
+              编辑
+            </Button>
+          )}
+          {canPublish && record.status === 0 && (
             <Button
               type="link"
               size="small"
@@ -126,7 +148,7 @@ const DefinitionList: React.FC = () => {
               发布
             </Button>
           )}
-          {record.status === 1 && (
+          {canDisable && record.status === 1 && (
             <Button
               type="link"
               size="small"
@@ -137,22 +159,26 @@ const DefinitionList: React.FC = () => {
               停用
             </Button>
           )}
-          <Button
-            type="link"
-            size="small"
-            icon={<CopyOutlined />}
-            onClick={() => handleCopy(record.id!)}
-          >
-            复制
-          </Button>
-          <Popconfirm
-            title="确定删除该流程定义吗？"
-            onConfirm={() => handleDelete(record.id!)}
-          >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              删除
+          {canCopy && (
+            <Button
+              type="link"
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={() => handleCopy(record.id!)}
+            >
+              复制
             </Button>
-          </Popconfirm>
+          )}
+          {canDelete && (
+            <Popconfirm
+              title="确定删除该流程定义吗？"
+              onConfirm={() => handleDelete(record.id!)}
+            >
+              <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+                删除
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -164,7 +190,7 @@ const DefinitionList: React.FC = () => {
         headerTitle="流程定义列表"
         actionRef={actionRef}
         rowKey="id"
-        toolBarRender={() => [
+        toolBarRender={() => canAdd ? [
           <Button
             key="create"
             type="primary"
@@ -173,7 +199,7 @@ const DefinitionList: React.FC = () => {
           >
             新建流程
           </Button>,
-        ]}
+        ] : []}
         request={async (params) => {
           const res = await pageDefinitions({
             page: params.current,
