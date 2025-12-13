@@ -360,6 +360,10 @@ const MyAttendance: React.FC = () => {
             <Upload
               fileList={fileList}
               beforeUpload={async (file) => {
+                if (file.size > 10 * 1024 * 1024) {
+                  message.error('文件大小不能超过10MB');
+                  return Upload.LIST_IGNORE;
+                }
                 const result = await handleUpload(file);
                 if (result) {
                   setFileList(prev => [...prev, { uid: result.id.toString(), name: file.name, status: 'done' }]);

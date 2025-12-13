@@ -15,6 +15,11 @@ export interface Announcement {
   createBy?: number;
   createByName?: string; // 发布者姓名
   createTime?: string;
+
+  // 非持久化字段（后端补充）
+  isRead?: number; // 0-未读 1-已读
+  readCount?: number; // 已读数
+  targetCount?: number; // 目标人数
 }
 
 // 获取用户可见的公告列表

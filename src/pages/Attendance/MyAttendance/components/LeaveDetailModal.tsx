@@ -3,6 +3,7 @@ import { DownloadOutlined, FileOutlined, FilePdfOutlined, FileWordOutlined, File
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { getInstance } from '@/services/workflow';
+import request, { download } from '@/utils/request';
 
 interface LeaveDetailModalProps {
   visible: boolean;
@@ -66,6 +67,7 @@ const isImageFile = (ext: string) => {
 const LeaveDetailModal: React.FC<LeaveDetailModalProps> = ({ visible, instanceId, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState<any>(null);
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (visible && instanceId) {
@@ -88,11 +90,50 @@ const LeaveDetailModal: React.FC<LeaveDetailModalProps> = ({ visible, instanceId
     }
   };
 
-  const handleDownload = (filePath: string, fileName: string) => {
-    const link = document.createElement('a');
-    link.href = `/api${filePath}`;
-    link.download = fileName;
-    link.click();
+  useEffect(() => {
+    let cancelled = false;
+    const urlsToRevoke: string[] = [];
+
+    const loadImages = async () => {
+      if (!detail) return;
+      const attachments = detail?.attachments || [];
+      const images = attachments.filter((f: any) => isImageFile(f.fileExt));
+      if (images.length === 0) return;
+
+      const next: Record<string, string> = {};
+      for (const f of images) {
+        try {
+          const resp = await request.get(f.filePath, { responseType: 'blob' });
+          const rawBlob: Blob = resp.data;
+          const blob = new Blob([rawBlob], { type: f.fileType || rawBlob.type || 'application/octet-stream' });
+          const url = window.URL.createObjectURL(blob);
+          next[String(f.id)] = url;
+          urlsToRevoke.push(url);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      if (!cancelled) {
+        setImageUrls((prev) => {
+          Object.values(prev).forEach((u) => window.URL.revokeObjectURL(u));
+          return next;
+        });
+      } else {
+        urlsToRevoke.forEach((u) => window.URL.revokeObjectURL(u));
+      }
+    };
+
+    loadImages();
+
+    return () => {
+      cancelled = true;
+      urlsToRevoke.forEach((u) => window.URL.revokeObjectURL(u));
+    };
+  }, [detail]);
+
+  const handleDownload = async (filePath: string, fileName: string) => {
+    await download(filePath, fileName);
   };
 
   const attachments = detail?.attachments || [];
@@ -205,7 +246,7 @@ const LeaveDetailModal: React.FC<LeaveDetailModalProps> = ({ visible, instanceId
                 >
                   {isImageFile(file.fileExt) ? (
                     <Image
-                      src={`/api${file.filePath}`}
+                      src={imageUrls[String(file.id)]}
                       alt={file.fileName}
                       style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 4 }}
                       preview={{ mask: '预览' }}

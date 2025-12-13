@@ -101,6 +101,17 @@ const AnnouncementPage: React.FC = () => {
       render: (_, record) => record.isTop ? <Tag color="red">是</Tag> : '-',
     },
     { title: '浏览量', dataIndex: 'viewCount', width: 80, hideInSearch: true },
+    {
+      title: '已读数',
+      dataIndex: 'readCount',
+      width: 100,
+      hideInSearch: true,
+      render: (_, record) => {
+        const read = record.readCount ?? 0;
+        const total = record.targetCount ?? 0;
+        return `${read}/${total}`;
+      },
+    },
     { title: '发布时间', dataIndex: 'publishTime', width: 150, hideInSearch: true,
       render: (_, record) => record.publishTime ? dayjs(record.publishTime).format('YYYY-MM-DD HH:mm') : '-',
     },

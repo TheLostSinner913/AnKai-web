@@ -440,8 +440,8 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
 
     // 底部版权信息
     footerRender: () => (
-      <div style={{ textAlign: 'center', padding: '24px 0', color: colors.textSecondary, fontSize: '14px', background: 'linear-gradient(to right, #f8fafc, #f1f5f9)', borderTop: '1px solid #e5e7eb' }}>
-        <span style={{ fontWeight: 500 }}>AnKai 管理系统</span> ©2025 Created with ❤️ by LDQ
+      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 99, textAlign: 'center', padding: '12px 0', color: colors.textSecondary, fontSize: '14px', background: 'linear-gradient(to right, #f8fafc, #f1f5f9)', borderTop: '1px solid #e5e7eb' }}>
+        <span style={{ fontWeight: 500 }}>AnKai 管理系统</span> ©2025 Created by LDQ 🐽
       </div>
     ),
 
@@ -454,7 +454,7 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
 
     // 页面切换时的loading
     childrenRender: (children) => (
-      <div style={{ minHeight: 'calc(100vh - 120px)', animation: 'fadeIn 0.3s ease-out' }}>{children}</div>
+      <div style={{ minHeight: 'calc(100vh - 56px)', paddingBottom: 56, animation: 'fadeIn 0.3s ease-out' }}>{children}</div>
     ),
 
     // 菜单点击事件

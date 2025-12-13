@@ -39,6 +39,7 @@ import {
   NotificationOutlined,
   EyeInvisibleOutlined,
   CheckOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import dayjs, { Dayjs } from 'dayjs';
@@ -54,7 +55,7 @@ import {
   unignoreTodo,
   Todo,
 } from '@/services/todo';
-import { getVisibleAnnouncements, Announcement } from '@/services/announcement';
+import { getVisibleAnnouncements, markAnnouncementAsRead, Announcement } from '@/services/announcement';
 import { pageMyPending } from '@/services/workflow';
 import { history } from '@umijs/max';
 import styles from './index.less';
@@ -76,6 +77,8 @@ const HomePage: React.FC = () => {
   const [todoDates, setTodoDates] = useState<string[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementDetailVisible, setAnnouncementDetailVisible] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [workflowTasks, setWorkflowTasks] = useState<any[]>([]);
   const [todoModalVisible, setTodoModalVisible] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
@@ -95,6 +98,11 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     loadTodoDates(selectedDate.year(), selectedDate.month() + 1);
   }, [selectedDate.year(), selectedDate.month()]);
+
+  const openAnnouncement = async (item: Announcement) => {
+    setSelectedAnnouncement(item);
+    setAnnouncementDetailVisible(true);
+  };
 
   // WebSocket 推送时自动刷新首页数据
   useEffect(() => {
@@ -670,13 +678,38 @@ const HomePage: React.FC = () => {
         ) : (
           <div className={styles.announcementList}>
             {announcements.map((item) => (
-              <div key={item.id} className={styles.announcementItem}>
+              <div key={item.id} className={styles.announcementItem} onClick={() => openAnnouncement(item)} style={{ cursor: 'pointer' }}>
                 <div className={styles.announcementHeader}>
-                  {item.isTop === 1 && <Tag color="red">置顶</Tag>}
-                  <Tag color={announcementTypeLabels[item.announcementType || 1].color}>
-                    {announcementTypeLabels[item.announcementType || 1].text}
-                  </Tag>
-                  <span className={styles.announcementTitle}>{item.title}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
+                    {item.isTop === 1 && <Tag color="red">置顶</Tag>}
+                    <Tag color={announcementTypeLabels[item.announcementType || 1].color}>
+                      {announcementTypeLabels[item.announcementType || 1].text}
+                    </Tag>
+                    {item.isRead !== 1 && <Tag color="gold">未读</Tag>}
+                    <span className={styles.announcementTitle}>{item.title}</span>
+                  </div>
+                  <Tooltip title="标记已读">
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CheckCircleOutlined style={{ color: item.isRead === 1 ? '#bfbfbf' : '#52c41a' }} />}
+                      disabled={!item.id || item.isRead === 1}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!item.id) return;
+                        try {
+                          await markAnnouncementAsRead(item.id);
+                          if (selectedAnnouncement?.id === item.id) {
+                            setSelectedAnnouncement({ ...selectedAnnouncement, isRead: 1 });
+                          }
+                        } catch (err) {
+                          // ignore
+                        } finally {
+                          loadData();
+                        }
+                      }}
+                    />
+                  </Tooltip>
                 </div>
                 <div className={styles.announcementMeta}>
                   <span className={styles.announcementAuthor}>
@@ -695,6 +728,31 @@ const HomePage: React.FC = () => {
           </div>
         )}
       </Card>
+
+      <Modal
+        title={selectedAnnouncement?.title || '公告详情'}
+        open={announcementDetailVisible}
+        onCancel={() => { setAnnouncementDetailVisible(false); setSelectedAnnouncement(null); }}
+        footer={null}
+        width={700}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 12 }}>
+          {selectedAnnouncement?.announcementType && (
+            <Tag color={announcementTypeLabels[selectedAnnouncement.announcementType].color}>
+              {announcementTypeLabels[selectedAnnouncement.announcementType].text}
+            </Tag>
+          )}
+          {selectedAnnouncement?.isRead !== 1 && <Tag color="gold">未读</Tag>}
+        </div>
+        <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 12 }}>
+          {selectedAnnouncement?.createByName || '系统'}
+          {selectedAnnouncement?.publishTime ? ` · ${dayjs(selectedAnnouncement.publishTime).format('YYYY-MM-DD HH:mm')}` : ''}
+        </div>
+        <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+          {selectedAnnouncement?.content}
+        </div>
+      </Modal>
 
       {/* 待办事项弹窗 */}
       <Modal
